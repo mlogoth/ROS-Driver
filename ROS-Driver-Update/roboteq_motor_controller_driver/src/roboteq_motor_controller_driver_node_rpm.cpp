@@ -1,4 +1,4 @@
-// #include <roboteq_motor_controller_driver/roboteq_motor_controller_driver_node.h>
+// #include <roboteq_motor_controller_driver/roboteq_motor_controller_driver_node_rpm.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/split.hpp>
 

@@ -152,9 +152,18 @@ add_executable(roboteq_motor_controller_driver_node
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(roboteq_motor_controller_driver_node  roboteq_motor_controller_driver_generate_messages_cpp)
+add_dependencies(roboteq_motor_controller_driver_node roboteq_motor_controller_driver_generate_messages_cpp)
 
 target_link_libraries(roboteq_motor_controller_driver_node
+  ${catkin_LIBRARIES}
+)
+
+add_executable(roboteq_motor_controller_driver_node_rpm
+ src/roboteq_motor_controller_driver_node_rpm.cpp)
+
+ add_dependencies(roboteq_motor_controller_driver_node_rpm  roboteq_motor_controller_driver_generate_messages_cpp)
+
+target_link_libraries(roboteq_motor_controller_driver_node_rpm
   ${catkin_LIBRARIES}
 )
 
@@ -228,7 +237,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
 )
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
-install(TARGETS roboteq_motor_controller_driver_node
+install(TARGETS roboteq_motor_controller_driver_node_rpm
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
