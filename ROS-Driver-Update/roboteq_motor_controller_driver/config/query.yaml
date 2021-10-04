@@ -1,12 +1,22 @@
-port : "/dev/ttyACM0"
+port : "/dev/ttyS0"
 baud : 115200
+
+# specify robot track width in meters
+track_width: 0.91
+# specify reduction ratio, if there is no put 1
+reduction_ratio: 91
+# specify reduction maximum linear velocity (m/s)
+max_vel: 0.3  # 17 m/min
+# specify robot wheel circumference (perimeter) in meters 
+wheel_circumference: 1.2854
 
 frequencyH : 50   #higher frequency (value is in ms)
 
 queryH:
  motor_amps : ?A 
  motor_command : ?M
- hall_count : ?Cb
+ hall_count : ?BCR
+ abs_hall_count : ?CB
  hall_speed : ?BS
  volts : ?V
  feedback : ?F 
