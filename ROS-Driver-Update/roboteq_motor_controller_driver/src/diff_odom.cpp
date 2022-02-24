@@ -262,6 +262,14 @@ void Odometry_calc::update()
 		odom.twist.twist.linear.y = 0;
 		odom.twist.twist.angular.z = dr;
 
+		//set covariance
+		odom.pose.covariance = {0.02, 0.0, 0.0, 0.0, 0.0, 0.0, 
+								0.0, 0.02, 0.0, 0.0, 0.0, 0.0, 
+								0.0, 0.0, 0.02, 0.0, 0.0, 0.0, 
+								0.0, 0.0, 0.0, 0.02, 0.0, 0.0, 
+								0.0, 0.0, 0.0, 0.0, 0.02, 0.0, 
+								0.0, 0.0, 0.0, 0.0, 0.0, 0.02};
+
 		//publish the message
 		odom_pub.publish(odom);
 
