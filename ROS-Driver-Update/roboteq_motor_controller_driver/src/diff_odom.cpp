@@ -51,40 +51,31 @@ private:
 	// double prev_right;
 
 	double rate;
-
 	ros::Duration t_delta;
-
 	ros::Time t_next;
-
 	ros::Time then;
-
 	double enc_left;
-
 	double enc_right;
-
 	double ticks_meter;
-
 	double encoder_cpr;
-
 	double base_width;
-
 	double S;
-
 	double wheel_circumference;
 
 	double dx;
 	double meters_per_tick;
 
 	double dr;
-
 	double x_final, y_final, theta_final, odom_yaw;
 
 	ros::Time current_time, last_time;
 
+	bool pub_tf = false;
+	std::string frame_id; 
+	std::string child_frame_id; 
+
 	void encoderBCR(const roboteq_motor_controller_driver::channel_values &left_ticks);
-
 	void init_variables();
-
 	void update();
 };
 
@@ -92,15 +83,18 @@ Odometry_calc::Odometry_calc()
 {
 
 	init_variables();
-
 	ROS_INFO("Started odometry computing node");
-
 	wheel_sub = n.subscribe("/track_motor_controller/hall_count", 1, &Odometry_calc::encoderBCR, this);
 	// wheel_sub = n.subscribe("/hall_count", 1, &Odometry_calc::encoderBCR, this);
-
 	odom_pub = n.advertise<nav_msgs::Odometry>("odom", 50);
 
 	//Retrieving parameters of this node
+	if (!n.getParam("/track_motor_controller/roboteq_motor_controller_driver/pub_tf", pub_tf))
+		pub_tf = false;
+	if (!n.getParam("/track_motor_controller/roboteq_motor_controller_driver/base_frame", child_frame_id))
+		child_frame_id = "base_link";
+	if (!n.getParam("/track_motor_controller/roboteq_motor_controller_driver/odom_frame", frame_id))
+		frame_id = "odom";
 }
 
 void Odometry_calc::init_variables()
@@ -239,8 +233,8 @@ void Odometry_calc::update()
 		//first, we'll publish the transform over tf
 		geometry_msgs::TransformStamped odom_trans;
 		odom_trans.header.stamp = now;
-		odom_trans.header.frame_id = "map"; //originally was set to odom
-		odom_trans.child_frame_id = "base_footprint";
+		odom_trans.header.frame_id = this->frame_id;; //originally was set to odom
+		odom_trans.child_frame_id = this->child_frame_id;
 
 		odom_trans.transform.translation.x = x_final;
 		odom_trans.transform.translation.y = y_final;
@@ -248,12 +242,13 @@ void Odometry_calc::update()
 		odom_trans.transform.rotation = odom_quat;
 
 		//send the transform
-		odom_broadcaster.sendTransform(odom_trans);
+		if (pub_tf)
+			odom_broadcaster.sendTransform(odom_trans);
 
 		//next, we'll publish the odometry message over ROS
 		nav_msgs::Odometry odom;
 		odom.header.stamp = now;
-		odom.header.frame_id = "odom";
+		odom.header.frame_id = this->frame_id;;
 
 		//set the position
 		odom.pose.pose.position.x = x_final;
@@ -262,7 +257,7 @@ void Odometry_calc::update()
 		odom.pose.pose.orientation = odom_quat;
 
 		//set the velocity
-		odom.child_frame_id = "base_footprint";
+		odom.child_frame_id = this->child_frame_id;
 		odom.twist.twist.linear.x = dx;
 		odom.twist.twist.linear.y = 0;
 		odom.twist.twist.angular.z = dr;
