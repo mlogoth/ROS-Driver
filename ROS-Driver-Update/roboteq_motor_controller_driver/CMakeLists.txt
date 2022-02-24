@@ -142,7 +142,9 @@ include_directories(
 add_executable(roboteq_motor_controller_driver_node
  #src/main.cpp
  src/roboteq_motor_controller_driver_node.cpp)
- #src/configservice.cpp)
+
+add_executable(roboteq_motor_controller_driver_node_brush
+ src/roboteq_motor_controller_driver_node_brush.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -152,9 +154,13 @@ add_executable(roboteq_motor_controller_driver_node
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(roboteq_motor_controller_driver_node  roboteq_motor_controller_driver_generate_messages_cpp)
+add_dependencies(roboteq_motor_controller_driver_node roboteq_motor_controller_driver_generate_messages_cpp)
+add_dependencies(roboteq_motor_controller_driver_node_brush roboteq_motor_controller_driver_generate_messages_cpp)
 
 target_link_libraries(roboteq_motor_controller_driver_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(roboteq_motor_controller_driver_node_brush
   ${catkin_LIBRARIES}
 )
 

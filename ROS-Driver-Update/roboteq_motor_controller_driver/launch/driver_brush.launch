@@ -1,0 +1,10 @@
+<launch>
+
+    <group ns="brush_motor_controller">
+    
+        <rosparam command="load" file="$(find roboteq_motor_controller_driver)/config/query_brush.yaml" />
+
+        <node name = "roboteq_motor_controller_driver_brush" pkg = "roboteq_motor_controller_driver" type = "roboteq_motor_controller_driver_node_brush" output = "screen">
+        </node>
+    </group>
+</launch>

@@ -44,6 +44,12 @@ private:
 	double left;
 	double right;
 
+	// double abs_left;
+	// double abs_right;
+
+	// double prev_left;
+	// double prev_right;
+
 	double rate;
 
 	ros::Duration t_delta;
@@ -89,7 +95,8 @@ Odometry_calc::Odometry_calc()
 
 	ROS_INFO("Started odometry computing node");
 
-	wheel_sub = n.subscribe("/hall_count", 1, &Odometry_calc::encoderBCR, this);
+	wheel_sub = n.subscribe("/track_motor_controller/hall_count", 1, &Odometry_calc::encoderBCR, this);
+	// wheel_sub = n.subscribe("/hall_count", 1, &Odometry_calc::encoderBCR, this);
 
 	odom_pub = n.advertise<nav_msgs::Odometry>("odom", 50);
 
@@ -154,6 +161,9 @@ void Odometry_calc::init_variables()
 	double reduction = 91;
 
 	meters_per_tick = (gearTeeth * beltPerimeter) / (hallRes * beltTeeth * reduction);
+
+	// prev_left = 0;
+	// prev_right = 0;
 }
 
 //Spin function
@@ -196,8 +206,8 @@ void Odometry_calc::update()
 		}
 		else
 		{
-			left_abs += left;
-			ROS_INFO_STREAM("Left " << left_abs);
+			// left_abs += left;
+			// ROS_INFO_STREAM("Left " << left_abs << "  right " << right_abs);
 			d_left = -left * meters_per_tick;
 			// ROS_INFO_STREAM("Left___" << left);
 			d_right = -right * meters_per_tick;
@@ -263,18 +273,29 @@ void Odometry_calc::update()
 		then = now;
 
 		left = 0;
-		right =0;
+		right = 0;
 	}
 }
 
 //Left encoder callback
 void Odometry_calc::encoderBCR(const roboteq_motor_controller_driver::channel_values &ticks)
 
-{
+{	
 	right = ticks.value[0];
 	left = ticks.value[1];
 
+	// abs_right = ticks.value[0];
+	// abs_left = ticks.value[1];
+
+	// right = abs_right - prev_right;
+	// left = abs_left - prev_left;
+
 	update();
+
+	// prev_right = abs_right;
+	// prev_left = abs_left;
+
+	// ROS_INFO_STREAM("Left:" << right << " Right: " << left);
 }
 
 

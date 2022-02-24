@@ -1,5 +1,5 @@
-port : "/dev/ttyACM1"
-# port : "/dev/ttyS1"
+# port : "/dev/ttyS0"
+port : "/dev/ttyACM0"
 baud : 115200
 
 # specify robot track width in meters
@@ -12,25 +12,16 @@ max_vel: 0.3  # 17 m/min
 wheel_circumference: 1.2854
 
 frequencyH : 50   #higher frequency (value is in ms)
-
-smooth_start_factor: 0.5
-
 queryH:
  motor_amps : ?A 
  motor_command : ?M
- hall_count : ?BCR
- abs_hall_count : ?CB
- hall_speed : ?BS
+#  hall_count : ?Cb
+#  hall_speed : ?BS
  volts : ?V
- feedback : ?F 
+ feedback : ?F
  battery_amps : ?BA
  power : ?P          
- fault_flag : ?FF
- runtime_status_flag : ?FM
- status_flag : ?FS
- phase_amps : ?PHA
-
-# amper_limit : ?ALIM  
+ fault_flag : ?FF 
 # motor_amps2 : ?MA
 # motor_command2 : ?FM
 # hall_count2 : ?FM
@@ -42,6 +33,6 @@ queryH:
 # fault_flag2 : ?S  
 # status_flag : ?FS
 # firmware_id : ?FID  
-# encoder_count : ?C
-# encoder_speed : ?S  
+ encoder_count : ?C
+ encoder_speed : ?S  
 

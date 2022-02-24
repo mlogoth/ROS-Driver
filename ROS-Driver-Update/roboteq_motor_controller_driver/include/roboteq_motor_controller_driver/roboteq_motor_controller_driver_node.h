@@ -65,8 +65,6 @@ public:
 	int frequencyG;
 	
 	
-	
-	
 	void roboteq_services();
 	bool configservice(roboteq_motor_controller_driver::config_srv::Request& req,     	roboteq_motor_controller_driver::config_srv::Response& res);
 	
