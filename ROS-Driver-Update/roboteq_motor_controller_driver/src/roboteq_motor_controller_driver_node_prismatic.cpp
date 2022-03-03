@@ -9,6 +9,7 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Empty.h>
+#include <std_msgs/Int16.h>
 #include <iostream>
 #include <sstream>
 #include <typeinfo>
@@ -63,13 +64,10 @@ private:
 		nh.getParam("port", port);
 		nh.getParam("baud", baud);
 		nh.getParam("track_width", track_width);
-		if (!nh.getParam("reduction_ratio", reduction_ratio))
-		{
-			reduction_ratio = 70;
-		}	
+		nh.getParam("reduction_ratio", reduction_ratio);
 		nh.getParam("max_vel", max_vel);
 		nh.getParam("wheel_circumference", wheel_circumference);
-		cmd_vel_sub = nh.subscribe("/cmd_vel", 10, &RoboteqDriver::cmd_vel_callback, this);
+		cmd_vel_sub = nh.subscribe("prism_vel", 10, &RoboteqDriver::cmd_vel_callback, this);
 
 		connect();
 	}
@@ -106,49 +104,20 @@ private:
 		run();
 	}
 
-	void cmd_vel_callback(const geometry_msgs::Twist &msg)
+	void cmd_vel_callback(const std_msgs::Int16 &msg)
 	{	 
 		// wheel speed (m/s)
-		double right_speed = msg.linear.x - track_width * msg.angular.z / 2.0;
-		double left_speed = msg.linear.x + track_width * msg.angular.z / 2.0;
+		int cmd = msg.data;
 
 		// ROS_INFO_STREAM("================================");
-		// ROS_INFO_STREAM("right_speed: " << right_speed);
-		// ROS_INFO_STREAM("left_speed: " << left_speed);
-
-		// set maximum linear speed at 0.35 m/s (4500rpm in motor)
-		if (fabs(right_speed) > max_vel)
-		{
-			if (right_speed > 0) {right_speed = max_vel;}
-			else {right_speed = -max_vel;}
-		}
-		if (fabs(left_speed) > max_vel)
-		{
-			if (left_speed > 0) {left_speed = max_vel;}
-			else {left_speed = -max_vel;}
-		}
-		// std::stringstream cmd_sub;
-		// ROS_INFO_STREAM("================================");
-		// ROS_INFO_STREAM("right_speed: " << right_speed);
-		// ROS_INFO_STREAM("left_speed: " << left_speed);
-
-		int32_t right_rpm = (right_speed * reduction_ratio * 60) / (wheel_circumference);
-    	int32_t left_rpm = (left_speed * reduction_ratio * 60) / (wheel_circumference);
-
-		// ROS_INFO_STREAM(reduction_ratio);
-		// ROS_INFO_STREAM("================================");
-		// ROS_INFO_STREAM("right_rpm: " << right_rpm);
-		// ROS_INFO_STREAM("left_rpm: " << left_rpm);
+		// ROS_INFO_STREAM("Motor Command:" << cmd);
 
 		std::stringstream right_cmd;
 		std::stringstream left_cmd;
 
-		right_cmd << "!S 1 " << (int)(right_rpm) << "\r";
-		left_cmd << "!S 2 " << (int)(left_rpm) << "\r";
+		right_cmd << "!G 2 " << cmd << "\r";
+		left_cmd << "!G 1 " << cmd << "\r";
 
-		// ROS_INFO_STREAM("----------------------------");
-		ROS_INFO_STREAM("Wheel Motors: right_rpm: "<<right_rpm << " - left_rpm: "<<left_rpm);
-		
 		ser.write(right_cmd.str());
 		ser.write(left_cmd.str());
 		ser.flush();
@@ -317,7 +286,7 @@ private:
 
 int main(int argc, char **argv)
 {
-	ros::init(argc, argv, "roboteq_motor_controller_driver_wheel");
+	ros::init(argc, argv, "roboteq_motor_controller_driver");
 
 	RoboteqDriver driver;
 

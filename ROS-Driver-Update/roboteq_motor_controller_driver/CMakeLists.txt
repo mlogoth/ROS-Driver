@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(roboteq_motor_controller_driver)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++11)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -139,22 +139,58 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/roboteq_motor_controller_driver_node.cpp)
+# add_executable(roboteq_motor_controller_driver_node_wheel
+#  #src/main.cpp
+#  src/roboteq_motor_controller_driver_node_wheel.cpp)
+#  #src/configservice.cpp)
+#  add_dependencies(roboteq_motor_controller_driver_node_wheel  roboteq_motor_controller_driver_generate_messages_cpp)
+
+#  target_link_libraries(roboteq_motor_controller_driver_node_wheel
+#    ${catkin_LIBRARIES}
+# )
+
 add_executable(roboteq_motor_controller_driver_node
- #src/main.cpp
  src/roboteq_motor_controller_driver_node.cpp)
- #src/configservice.cpp)
 
-## Rename C++ executable without prefix
-## The above recommended prefix causes long target names, the following renames the
-## target back to the shorter version for ease of user use
-## e.g. "rosrun someones_pkg node" instead of "rosrun someones_pkg someones_pkg_node"
-# set_target_properties(${PROJECT_NAME}_node PROPERTIES OUTPUT_NAME node PREFIX "")
+ add_dependencies(roboteq_motor_controller_driver_node  roboteq_motor_controller_driver_generate_messages_cpp)
 
-## Add cmake target dependencies of the executable
-## same as for the library above
-add_dependencies(roboteq_motor_controller_driver_node  roboteq_motor_controller_driver_generate_messages_cpp)
+ target_link_libraries(roboteq_motor_controller_driver_node
+   ${catkin_LIBRARIES}
+ )
 
-target_link_libraries(roboteq_motor_controller_driver_node
+add_executable(roboteq_motor_controller_driver_node_wheel_spyros
+ src/roboteq_motor_controller_driver_node_wheel_spyros.cpp)
+
+ add_dependencies(roboteq_motor_controller_driver_node_wheel_spyros  roboteq_motor_controller_driver_generate_messages_cpp)
+
+ target_link_libraries(roboteq_motor_controller_driver_node_wheel_spyros
+   ${catkin_LIBRARIES}
+ )
+
+add_executable(roboteq_motor_controller_driver_node_prismatic
+ src/roboteq_motor_controller_driver_node_prismatic.cpp)
+
+ add_dependencies(roboteq_motor_controller_driver_node_prismatic  roboteq_motor_controller_driver_generate_messages_cpp)
+
+ target_link_libraries(roboteq_motor_controller_driver_node_prismatic
+   ${catkin_LIBRARIES}
+ )
+ 
+add_executable(roboteq_motor_controller_driver_node_prismatic_service
+ src/roboteq_motor_controller_driver_node_prismatic_service.cpp)
+
+ add_dependencies(roboteq_motor_controller_driver_node_prismatic_service  roboteq_motor_controller_driver_generate_messages_cpp)
+
+ target_link_libraries(roboteq_motor_controller_driver_node_prismatic_service
+   ${catkin_LIBRARIES}
+ )
+
+add_executable(roboteq_motor_controller_driver_node_mower
+src/roboteq_motor_controller_driver_node_mower.cpp)
+
+add_dependencies(roboteq_motor_controller_driver_node_mower  roboteq_motor_controller_driver_generate_messages_cpp)
+
+target_link_libraries(roboteq_motor_controller_driver_node_mower
   ${catkin_LIBRARIES}
 )
 
@@ -192,6 +228,15 @@ add_executable(diff_odom
  add_dependencies(diff_odom  roboteq_motor_controller_driver_generate_messages_cpp)
 
 target_link_libraries(diff_odom
+  ${catkin_LIBRARIES}
+)
+
+add_executable(diff_odom_spyros_24_2
+ src/diff_odom_spyros_24_2.cpp)
+
+ add_dependencies(diff_odom_spyros_24_2  roboteq_motor_controller_driver_generate_messages_cpp)
+
+target_link_libraries(diff_odom_spyros_24_2
   ${catkin_LIBRARIES}
 )
 
@@ -233,6 +278,12 @@ install(TARGETS roboteq_motor_controller_driver_node
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
+
+# install(TARGETS roboteq_motor_controller_driver_node_wheel
+#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+#  )
 
 ## Mark libraries for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_libraries.html

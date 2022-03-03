@@ -1,0 +1,11 @@
+<launch>
+
+<rosparam command="load" file="$(find roboteq_motor_controller_driver)/config/query_wheel.yaml" />
+
+<node name = "roboteq_motor_controller_driver_wheel" pkg = "roboteq_motor_controller_driver_wheel" type = "roboteq_motor_controller_driver_node_wheel" output = "screen">
+
+
+</node>
+
+ 
+</launch>

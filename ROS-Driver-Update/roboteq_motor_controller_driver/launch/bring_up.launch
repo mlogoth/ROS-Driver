@@ -1,0 +1,22 @@
+<launch>
+<!-- Wheel motor controller Driver -->
+<include file="$(find roboteq_motor_controller_driver)/launch/driver.launch"  ns="wheel"/>
+
+<!-- Mower motor controller Driver -->
+<include file="$(find roboteq_motor_controller_driver)/launch/driver_mower.launch" ns="mower"/>
+
+<!-- Prismatic motor controller Driver -->
+<include file="$(find roboteq_motor_controller_driver)/launch/driver_prismatic.launch" ns="mowing_deck"/>
+
+<!-- Xsens Driver -->
+<!-- <include file="$(find xsens_mti_driver)/launch/xsens_mti_node_v2.launch" ns="xsens"/> -->
+
+<!-- Aristos Teleop Node -->
+<include file="$(find aristos_teleop)/launch/teleop.launch">
+    <arg name="cmd_topic_vel" value="/cmd_vel"/>
+</include>
+
+<!-- Labjack GPIO Driver -->
+<include file="$(find gpio_labjack)/launch/labjack_v2.launch" ns="labjackIO"/>
+
+</launch>

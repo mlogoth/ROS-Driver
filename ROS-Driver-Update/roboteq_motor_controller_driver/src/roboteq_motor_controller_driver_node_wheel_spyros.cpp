@@ -55,6 +55,19 @@ private:
 	int frequencyH;
 	int frequencyL;
 	int frequencyG;
+
+	int motor_1_accel;
+	int motor_2_accel;
+	int motor_1_dec;
+	int motor_2_dec;
+	int motor_1_alim;
+	int motor_2_alim;
+	int motor_1_maxrpm;
+	int motor_2_maxrpm;
+	int motor_1_initabscount;
+	int motor_2_initabscount;
+	int configs_init ; 
+
 	ros::NodeHandle nh;
 
 	void initialize()
@@ -63,14 +76,25 @@ private:
 		nh.getParam("port", port);
 		nh.getParam("baud", baud);
 		nh.getParam("track_width", track_width);
-		if (!nh.getParam("reduction_ratio", reduction_ratio))
-		{
-			reduction_ratio = 70;
-		}	
+		nh.getParam("reduction_ratio", reduction_ratio);
 		nh.getParam("max_vel", max_vel);
 		nh.getParam("wheel_circumference", wheel_circumference);
+
+		//read parameters-limits to configure the driver
+		nh.param("motor_1_accel", motor_1_accel, 200);
+		nh.param("motor_2_accel", motor_2_accel, 200);
+		nh.param("motor_1_dec", motor_1_dec, 200);
+		nh.param("motor_2_dec", motor_2_dec, 200);
+		nh.param("motor_1_alim", motor_1_alim, 4);
+		nh.param("motor_2_alim", motor_2_alim, 4);
+		nh.param("motor_1_maxrpm", motor_1_maxrpm, 1000);
+		nh.param("motor_2_maxrpm", motor_2_maxrpm, 1000);
+		nh.param("motor_1_initabscount", motor_1_initabscount, 0);
+		nh.param("motor_2_initabscount", motor_2_initabscount, 0);
+		ROS_INFO_STREAM("motor_1_initabscount : " << motor_1_initabscount);
 		cmd_vel_sub = nh.subscribe("/cmd_vel", 10, &RoboteqDriver::cmd_vel_callback, this);
 
+		configs_init = 0 ; 
 		connect();
 	}
 
@@ -113,8 +137,8 @@ private:
 		double left_speed = msg.linear.x + track_width * msg.angular.z / 2.0;
 
 		// ROS_INFO_STREAM("================================");
-		// ROS_INFO_STREAM("right_speed: " << right_speed);
-		// ROS_INFO_STREAM("left_speed: " << left_speed);
+		// ROS_INFO_STREAM("right_speed:" << right_speed);
+		// ROS_INFO_STREAM("left_speed" << left_speed);
 
 		// set maximum linear speed at 0.35 m/s (4500rpm in motor)
 		if (fabs(right_speed) > max_vel)
@@ -128,17 +152,9 @@ private:
 			else {left_speed = -max_vel;}
 		}
 		// std::stringstream cmd_sub;
-		// ROS_INFO_STREAM("================================");
-		// ROS_INFO_STREAM("right_speed: " << right_speed);
-		// ROS_INFO_STREAM("left_speed: " << left_speed);
 
 		int32_t right_rpm = (right_speed * reduction_ratio * 60) / (wheel_circumference);
     	int32_t left_rpm = (left_speed * reduction_ratio * 60) / (wheel_circumference);
-
-		// ROS_INFO_STREAM(reduction_ratio);
-		// ROS_INFO_STREAM("================================");
-		// ROS_INFO_STREAM("right_rpm: " << right_rpm);
-		// ROS_INFO_STREAM("left_rpm: " << left_rpm);
 
 		std::stringstream right_cmd;
 		std::stringstream left_cmd;
@@ -146,7 +162,7 @@ private:
 		right_cmd << "!S 1 " << (int)(right_rpm) << "\r";
 		left_cmd << "!S 2 " << (int)(left_rpm) << "\r";
 
-		// ROS_INFO_STREAM("----------------------------");
+		ROS_INFO_STREAM("----------------------------");
 		ROS_INFO_STREAM("Wheel Motors: right_rpm: "<<right_rpm << " - left_rpm: "<<left_rpm);
 		
 		ser.write(right_cmd.str());
@@ -155,6 +171,7 @@ private:
 	}
 
 	ros::NodeHandle n;
+	ros::NodeHandle privn;
 	ros::ServiceServer configsrv;
 	ros::ServiceServer commandsrv;
 	ros::ServiceServer maintenancesrv;
@@ -174,13 +191,15 @@ private:
 
 	bool commandservice(roboteq_motor_controller_driver::command_srv::Request &request, roboteq_motor_controller_driver::command_srv::Response &response)
 	{
+		ROS_INFO_STREAM("********************************************************************************");
 		std::stringstream str;
 		str << "!" << request.userInput << " " << request.channel << " " << request.value << "_";
 		ser.write(str.str());
 		ser.flush();
 		response.result = str.str();
 
-		ROS_INFO_STREAM(response.result);
+		//ROS_INFO_STREAM(response.result);
+		ROS_INFO("********************************************************************************");
 		return true;
 	}
 
@@ -203,11 +222,111 @@ private:
 		configsrv = n.advertiseService("config_service", &RoboteqDriver::configservice, this);
 		commandsrv = n.advertiseService("command_service", &RoboteqDriver::commandservice, this);
 		maintenancesrv = n.advertiseService("maintenance_service", &RoboteqDriver::maintenanceservice, this);
+
+		// privn = ros::NodeHandle("~");
+		// ros::ServiceClient config_client = privn.serviceClient<roboteq_motor_controller_driver::config_srv>("config_service");
+		// ros::ServiceClient command_client = privn.serviceClient<roboteq_motor_controller_driver::command_srv>("command_service");
+
+		// roboteq_motor_controller_driver::config_srv config_s;
+		// roboteq_motor_controller_driver::command_srv command_s;
+
+		// command_s.request.userInput = "CB";
+		// command_s.request.channel = 1;
+		// command_s.request.value = motor_1_initabscount;
+		// if (command_client.call(command_s))
+		// {
+		// 	ROS_INFO_STREAM("success");
+		// }
+		// else
+		// {
+		// 	ROS_INFO_STREAM("failure");
+		// 	ROS_INFO_STREAM(command_client.call(command_s));
+		// }
+	}
+
+	void set_limits()
+	{
+		privn = ros::NodeHandle("~");
+		ros::ServiceClient config_client = privn.serviceClient<roboteq_motor_controller_driver::config_srv>("config_service");
+		ros::ServiceClient command_client = privn.serviceClient<roboteq_motor_controller_driver::command_srv>("command_service");
+
+		roboteq_motor_controller_driver::config_srv config_s;
+		roboteq_motor_controller_driver::command_srv command_s;
+
+
+		// //Motor 1
+		// config_s.request.userInput = "ALIM";
+		// config_s.request.channel = 1;
+		// config_s.request.value = motor_1_alim;
+		// //config_client.call(config_s);
+
+		// config_s.request.userInput = "MXRPM";
+		// config_s.request.channel = 1;
+		// config_s.request.value = motor_1_maxrpm;
+		// //config_client.call(config_s);
+
+		// command_s.request.userInput = "AC";
+		// command_s.request.channel = 1;
+		// command_s.request.value = motor_1_accel;
+		// //command_client.call(command_s);
+
+		// command_s.request.userInput = "DC";
+		// command_s.request.channel = 1;
+		// command_s.request.value = motor_1_dec;
+		// //command_client.call(command_s);
+
+		command_s.request.userInput = "CB";
+		command_s.request.channel = 1;
+		command_s.request.value = motor_1_initabscount;
+		if (command_client.call(command_s))
+		{
+			ROS_INFO_STREAM("success");
+		}
+		else
+		{
+			ROS_INFO_STREAM("failure");
+			ROS_INFO_STREAM(command_client.call(command_s));
+		}
+
+		//Motor 2
+		config_s.request.userInput = "ALIM";
+		config_s.request.channel = 2;
+		config_s.request.value = motor_2_alim;
+		//config_client.call(config_s);
+
+		config_s.request.userInput = "MXRPM";
+		config_s.request.channel = 2;
+		config_s.request.value = motor_2_maxrpm;
+		//config_client.call(config_s);
+
+		command_s.request.userInput = "AC";
+		command_s.request.channel = 2;
+		command_s.request.value = motor_2_accel;
+		//command_client.call(command_s);
+
+		command_s.request.userInput = "DC";
+		command_s.request.channel = 2;
+		command_s.request.value = motor_2_dec;
+		//command_client.call(command_s);
+
+		command_s.request.userInput = "CB";
+		command_s.request.channel = 2;
+		command_s.request.value = motor_2_initabscount;
+		// if (command_client.call(command_s))
+		// {
+		// 	ROS_INFO_STREAM("success");
+		// }
+		// else
+		// {
+		// 	ROS_INFO_STREAM("failure");
+		// }
 	}
 
 	void run()
 	{
 		initialize_services();
+		
+
 		std_msgs::String str1;
 		ros::NodeHandle nh;
 		nh.getParam("frequencyH", frequencyH);
@@ -224,6 +343,8 @@ private:
 		std::stringstream ss2;
 		std::stringstream ss3;
 		std::vector<std::string> KH_vector;
+
+		
 
 		ss0 << "^echof 1_";
 		ss1 << "# c_/\"DH?\",\"?\"";
@@ -254,11 +375,19 @@ private:
 		int count = 0;
 		read_publisher = nh.advertise<std_msgs::String>("read", 1000);
 		sleep(2);
+
+
+
 		ros::Rate loop_rate(5);
 		while (ros::ok())
 		{
 
 			ros::spinOnce();
+
+			if (configs_init == 0){
+				set_limits();
+				configs_init +=  1 ; 
+			}
 			if (ser.available())
 			{
 
