@@ -4,8 +4,8 @@
 
 <node name = "roboteq_motor_controller_driver_prismatic" pkg = "roboteq_motor_controller_driver" type = "roboteq_motor_controller_driver_node_prismatic" output = "screen">
 </node>
-
+<!-- 
 <node name = "roboteq_motor_controller_driver_prismatic_service" pkg = "roboteq_motor_controller_driver" type = "roboteq_motor_controller_driver_node_prismatic_service" output = "screen">
-</node>
+</node> -->
  
 </launch>

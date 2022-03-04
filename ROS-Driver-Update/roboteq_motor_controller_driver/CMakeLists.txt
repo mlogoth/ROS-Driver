@@ -158,14 +158,6 @@ add_executable(roboteq_motor_controller_driver_node
    ${catkin_LIBRARIES}
  )
 
-add_executable(roboteq_motor_controller_driver_node_wheel_spyros
- src/roboteq_motor_controller_driver_node_wheel_spyros.cpp)
-
- add_dependencies(roboteq_motor_controller_driver_node_wheel_spyros  roboteq_motor_controller_driver_generate_messages_cpp)
-
- target_link_libraries(roboteq_motor_controller_driver_node_wheel_spyros
-   ${catkin_LIBRARIES}
- )
 
 add_executable(roboteq_motor_controller_driver_node_prismatic
  src/roboteq_motor_controller_driver_node_prismatic.cpp)
@@ -175,15 +167,7 @@ add_executable(roboteq_motor_controller_driver_node_prismatic
  target_link_libraries(roboteq_motor_controller_driver_node_prismatic
    ${catkin_LIBRARIES}
  )
- 
-add_executable(roboteq_motor_controller_driver_node_prismatic_service
- src/roboteq_motor_controller_driver_node_prismatic_service.cpp)
 
- add_dependencies(roboteq_motor_controller_driver_node_prismatic_service  roboteq_motor_controller_driver_generate_messages_cpp)
-
- target_link_libraries(roboteq_motor_controller_driver_node_prismatic_service
-   ${catkin_LIBRARIES}
- )
 
 add_executable(roboteq_motor_controller_driver_node_mower
 src/roboteq_motor_controller_driver_node_mower.cpp)
@@ -230,16 +214,6 @@ add_executable(diff_odom
 target_link_libraries(diff_odom
   ${catkin_LIBRARIES}
 )
-
-add_executable(diff_odom_spyros_24_2
- src/diff_odom_spyros_24_2.cpp)
-
- add_dependencies(diff_odom_spyros_24_2  roboteq_motor_controller_driver_generate_messages_cpp)
-
-target_link_libraries(diff_odom_spyros_24_2
-  ${catkin_LIBRARIES}
-)
-
 
 ## Specify libraries to link a library or executable target against
 # target_link_libraries(${PROJECT_NAME}_node
