@@ -1,4 +1,4 @@
-port : "/dev/ttyS2"
+port : $(arg driver_port)
 baud : 115200
 
 # specify robot track width in meters
@@ -14,16 +14,17 @@ encoder_cpr: 6
 encoder_min: -65536
 encoder_max: 65536 
 rate: 20 
-enable_imu_yaw: false
-imu_topic: /xsens/imu/data
+enable_imu_yaw: $(arg use_imu)
+imu_topic: $(arg imu_topic)
 wrapping_enabled: false
 wrp_lim: 0.3
 sub_to_abs: true
 imu_discarded: 100
 tf_publish: true
 odom_topic: odom
-tf_child_frame: base_footprint
-tf_header_frame: map
+tf_header_frame: $(arg prefix)odom
+tf_child_frame: $(arg prefix)base_footprint
+
 
 
 frequencyH : 50   #higher frequency (value is in ms)

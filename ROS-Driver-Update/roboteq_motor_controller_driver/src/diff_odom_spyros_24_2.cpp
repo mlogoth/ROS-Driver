@@ -106,11 +106,12 @@ private:
 	void OdomPub();
 };
 
-Odometry_calc::Odometry_calc(ros::NodeHandle pn)
+Odometry_calc::Odometry_calc(ros::NodeHandle _pn)
 {
 	/////////////////////////////
 	//Encoder related variables//
 	/////////////////////////////
+	pn = _pn;
 	pn.param("encoder_cpr", encoder_cpr, 24);
 	ROS_INFO_STREAM("encoder_cpr: " << encoder_cpr);	
 	pn.param("encoder_min", encoder_min, -65536);
@@ -157,6 +158,8 @@ Odometry_calc::Odometry_calc(ros::NodeHandle pn)
 	//////////////////////////
 	pn.param("rate", rate, 50);
 	ROS_INFO_STREAM("rate: " << rate);
+	imu_initialized = false;
+	imu_cnt = 0;
 
 	init_variables();
 	ROS_INFO("Started odometry computing node");
@@ -168,7 +171,7 @@ Odometry_calc::Odometry_calc(ros::NodeHandle pn)
 	{
 		wheel_sub = pn.subscribe("hall_count", 1, &Odometry_calc::encoderBCR, this);
 	}
-	odom_pub = n.advertise<nav_msgs::Odometry>(odom_topic, 50);
+	odom_pub = pn.advertise<nav_msgs::Odometry>(odom_topic, 50);
 	if (enable_imu_yaw)
 	{
 		imu_setup();
@@ -303,17 +306,18 @@ void Odometry_calc::update()
 		x_final = x_final + DeltaX;
 		y_final = y_final + DeltaY;
 	}
-
+	// std::cout << "IMU initialized? "<< imu_initialized << std::endl;
+	// std::cout << "IMU enabled? "<< enable_imu_yaw << std::endl;
 	//angular
 	if ((!enable_imu_yaw) || (enable_imu_yaw && !imu_initialized))
 	{
-		DeltaTh = (d_right - d_left) / track_width; // th is tan(th)
+		DeltaTh = (d_left - d_right) / track_width; // th is tan(th)
 		dr = DeltaTh / elapsed;
 		theta_final = theta_final + DeltaTh;
 	}
 	else
 	{
-		ROS_INFO_STREAM("using imu88888888888888888888888888888888888888888888888888888888");
+		// ROS_INFO_STREAM("using imu88888888888888888888888888888888888888888888888888888888");
 		theta_final = imu_yaw;
     	dr = (imu_yaw - prev_imu_yaw)/elapsed;
 	}
@@ -326,11 +330,11 @@ void Odometry_calc::update()
 	////////////////
 	//debug prints//
 	////////////////
-	ROS_INFO_STREAM("x final: " << x_final);
-	ROS_INFO_STREAM("y final: " << y_final);
-	ROS_INFO_STREAM("theta_final: " << theta_final*180.0/3.12);
-	ROS_INFO_STREAM("left_abs_hall_count: " << left_count_abs);
-	ROS_INFO_STREAM("right_abs_hall_count: " << right_count_abs);
+	// ROS_INFO_STREAM("x final: " << x_final);
+	// ROS_INFO_STREAM("y final: " << y_final);
+	// ROS_INFO_STREAM("theta_final: " << theta_final*180.0/3.14);
+	// ROS_INFO_STREAM("left_abs_hall_count: " << left_count_abs);
+	// ROS_INFO_STREAM("right_abs_hall_count: " << right_count_abs);
 
 }
 
@@ -399,13 +403,14 @@ void Odometry_calc::imu_setup()
 {
   if (enable_imu_yaw)
   {
-    imu_sub = n.subscribe(imu_topic, 100, &Odometry_calc::imu_callback, this);
+    imu_sub = pn.subscribe(imu_topic, 100, &Odometry_calc::imu_callback, this);
   };
 }
 
 void Odometry_calc::imu_callback(const sensor_msgs::Imu &imu)
 {
 	prev_imu_yaw = imu_yaw;
+	// ROS_INFO("Imu callback");
   //TF quaternion
   tf::Quaternion q(
       imu.orientation.x,
@@ -419,6 +424,7 @@ void Odometry_calc::imu_callback(const sensor_msgs::Imu &imu)
   double roll, pitch, yaw;
   m.getRPY(roll, pitch, yaw);
   // Check if yaw is NaN: When yaw= NaN, then the statement yaw!=yaw is always True
+//   std::cout << "Imu counts to initialize? "<<imu_cnt << std::endl;
   if (yaw == yaw)
   {
     if (!imu_initialized)

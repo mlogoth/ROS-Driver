@@ -69,7 +69,7 @@ private:
 		}	
 		nh.getParam("max_vel", max_vel);
 		nh.getParam("wheel_circumference", wheel_circumference);
-		cmd_vel_sub = nh.subscribe("/cmd_vel", 10, &RoboteqDriver::cmd_vel_callback, this);
+		cmd_vel_sub = nh.subscribe("cmd_vel", 10, &RoboteqDriver::cmd_vel_callback, this);
 
 		connect();
 	}
