@@ -9,6 +9,8 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Empty.h>
+#include <std_msgs/Bool.h>
+#include <std_msgs/Int16.h>
 #include <iostream>
 #include <sstream>
 #include <typeinfo>
@@ -50,6 +52,14 @@ private:
 	ros::Publisher read_publisher;
 	ros::Subscriber cmd_vel_sub;
 
+	std::string motor_type;
+	std::string motor_1_type;
+	std::string motor_2_type;	
+	std::string channel_mode;
+	ros::Subscriber cmd_vel_channel_1_sub;
+	ros::Subscriber cmd_vel_channel_2_sub;
+	int rate; 
+
 	int channel_number_1;
 	int channel_number_2;
 	int frequencyH;
@@ -62,14 +72,94 @@ private:
 
 		nh.getParam("port", port);
 		nh.getParam("baud", baud);
-		nh.getParam("track_width", track_width);
-		if (!nh.getParam("reduction_ratio", reduction_ratio))
+
+		if (!nh.getParam("rate", rate))
 		{
-			reduction_ratio = 70;
-		}	
-		nh.getParam("max_vel", max_vel);
-		nh.getParam("wheel_circumference", wheel_circumference);
-		cmd_vel_sub = nh.subscribe("cmd_vel", 10, &RoboteqDriver::cmd_vel_callback, this);
+			rate = 5; 
+		}
+
+		if (!nh.getParam("channel_mode", channel_mode))
+		{
+			ROS_INFO_STREAM("No channel mode was selected. Assigning driver as dual.");
+			channel_mode = "dual";
+		}
+		if ((channel_mode ==   "dual") && (!nh.getParam("motor_type", motor_type)))
+		{
+			ROS_INFO_STREAM("No valid general motor type was selected. Assigning skid_steering.");
+			motor_type = "skid_steering";
+		}
+		if ((channel_mode == "single") && (!nh.getParam("motor_1_type", motor_1_type)))
+		{
+			ROS_ERROR_STREAM("No motor type was found for motor 1. Shutting down.");
+			ros::shutdown();
+		}
+		if ((channel_mode == "single") && (!nh.getParam("motor_2_type", motor_2_type)))
+		{
+			ROS_ERROR_STREAM("No motor type was found for motor 2. Shutting down.");
+			ros::shutdown();
+		}
+
+		if (motor_type == "skid_steering")
+		{
+			nh.getParam("track_width", track_width);
+			nh.getParam("max_vel", max_vel);
+			if (!nh.getParam("reduction_ratio", reduction_ratio))
+			{
+				reduction_ratio = 70;
+			}
+			nh.getParam("wheel_circumference", wheel_circumference);
+			ROS_INFO_STREAM("Driver controls two motors moving a skid steering vehicle.");
+			cmd_vel_sub = nh.subscribe("cmd_vel", 10, &RoboteqDriver::skid_steering_vel_callback, this);
+		}
+		else if (channel_mode == "dual")
+		{
+			ROS_INFO_STREAM("Driver controls two motors with a single value.");
+			if (motor_1_type == "set_speed")
+			{
+				ROS_INFO_STREAM("Motor 1 is operating in closed loop mode.");
+				cmd_vel_channel_1_sub = nh.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);				
+			}
+			else
+			{
+				ROS_INFO_STREAM("Motor 1 is operating in open loop mode.");
+				cmd_vel_channel_1_sub = nh.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);
+			}
+			if (motor_2_type == "set_speed")
+			{
+				ROS_INFO_STREAM("Motor 2 is operating in closed loop mode.");
+				cmd_vel_channel_2_sub = nh.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);				
+			}
+			else
+			{
+				ROS_INFO_STREAM("Motor 2 is operating in open loop mode.");
+				cmd_vel_channel_2_sub = nh.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);
+			}
+		}
+		else if (channel_mode == "single")
+		{
+			ROS_INFO_STREAM("Driver controls two motors seperately.");
+			if (motor_1_type == "set_speed")
+			{
+				ROS_INFO_STREAM("Motor 1 is operating in closed loop mode.");
+				cmd_vel_channel_1_sub = nh.subscribe("chan_1_set_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);				
+			}
+			else
+			{
+				ROS_INFO_STREAM("Motor 1 is operating in open loop mode.");
+				cmd_vel_channel_1_sub = nh.subscribe("chan_1_go_to_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);
+			}
+			if (motor_2_type == "set_speed")
+			{
+				ROS_INFO_STREAM("Motor 2 is operating in closed loop mode.");
+				cmd_vel_channel_2_sub = nh.subscribe("chan_2_set_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);				
+			}
+			else
+			{
+				ROS_INFO_STREAM("Motor 2 is operating in open loop mode.");
+				cmd_vel_channel_2_sub = nh.subscribe("chan_2_go_to_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);
+			}
+		}
+
 
 		connect();
 	}
@@ -106,7 +196,7 @@ private:
 		run();
 	}
 
-	void cmd_vel_callback(const geometry_msgs::Twist &msg)
+	void skid_steering_vel_callback(const geometry_msgs::Twist &msg)
 	{	 
 		// wheel speed (m/s)
 		double right_speed = msg.linear.x - track_width * msg.angular.z / 2.0;
@@ -153,6 +243,74 @@ private:
 		ser.write(left_cmd.str());
 		ser.flush();
 	}
+
+	void dual_vel_callback(const std_msgs::Int16 &msg)
+	{	 
+		// wheel speed (m/s)
+		int cmd = msg.data;
+
+		// ROS_INFO_STREAM("================================");
+		// ROS_INFO_STREAM("Motor Command:" << cmd);
+
+		std::stringstream right_cmd;
+		std::stringstream left_cmd;
+
+		if (motor_type == "go_to_speed")
+		{
+			right_cmd << "!G 2 " << cmd << "\r";
+			left_cmd << "!G 1 " << cmd << "\r";			
+		}
+		else if (motor_type == "set_speed")
+		{
+			right_cmd << "!S 2 " << cmd << "\r";
+			left_cmd << "!S 1 " << cmd << "\r";			
+		}
+
+		ser.write(right_cmd.str());
+		ser.write(left_cmd.str());
+		ser.flush();
+	}
+
+	void channel_1_vel_callback(const std_msgs::Int16 &msg)
+	{	 
+		// wheel speed (m/s)
+		int cmd = msg.data;
+
+		std::stringstream channel_1_cmd;
+
+		if (motor_1_type == "go_to_speed")
+		{
+			channel_1_cmd << "!G 1 " << cmd << "\r";			
+		}
+		else if (motor_1_type == "set_speed")
+		{
+			channel_1_cmd << "!S 1 " << cmd << "\r";			
+		}
+
+		ser.write(channel_1_cmd.str());
+		ser.flush();
+	}
+
+	void channel_2_vel_callback(const std_msgs::Int16 &msg)
+	{	 
+		// wheel speed (m/s)
+		int cmd = msg.data;
+
+		std::stringstream channel_2_cmd;
+
+		if (motor_2_type == "go_to_speed")
+		{
+			channel_2_cmd << "!G 2 " << cmd << "\r";			
+		}
+		else if (motor_2_type == "set_speed")
+		{
+			channel_2_cmd << "!S 2 " << cmd << "\r";			
+		}
+
+		ser.write(channel_2_cmd.str());
+		ser.flush();
+	}
+
 
 	ros::NodeHandle n;
 	ros::ServiceServer configsrv;
@@ -257,7 +415,6 @@ private:
 		ros::Rate loop_rate(5);
 		while (ros::ok())
 		{
-
 			ros::spinOnce();
 			if (ser.available())
 			{
@@ -317,7 +474,7 @@ private:
 
 int main(int argc, char **argv)
 {
-	ros::init(argc, argv, "roboteq_motor_controller_driver_wheel");
+	ros::init(argc, argv, "roboteq_motor_controller_driver");
 
 	RoboteqDriver driver;
 
