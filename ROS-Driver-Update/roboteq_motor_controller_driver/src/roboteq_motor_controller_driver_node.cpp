@@ -75,7 +75,7 @@ private:
 
 		if (!nh.getParam("rate", rate))
 		{
-			rate = 20; 
+			rate = 5; 
 		}
 
 		if (!nh.getParam("channel_mode", channel_mode))
@@ -412,10 +412,9 @@ private:
 		int count = 0;
 		read_publisher = nh.advertise<std_msgs::String>("read", 1000);
 		sleep(2);
-		ros::Rate loop_rate(rate);
+		ros::Rate loop_rate(5);
 		while (ros::ok())
 		{
-
 			ros::spinOnce();
 			if (ser.available())
 			{
