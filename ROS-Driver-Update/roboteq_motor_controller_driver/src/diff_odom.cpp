@@ -36,15 +36,15 @@ private:
 	//Exposed variables//
 	/////////////////////
 	int encoder_cpr;
-	int encoder_min;
-	int encoder_max;
+	double encoder_min;
+	double encoder_max;
 	int reduction_ratio;
 	double wheel_circumference;
 	double track_width;
 	int rate;
 	bool enable_imu_yaw;
 	std::string imu_topic;
-	bool wrapping_enabled;
+	//bool wrapping_enabled;
 	double wrp_lim; 
 	bool sub_to_abs;	// subscribe to abs_hall_count instead of hall_count topic to receive the total-absolute number of pulses instead of the relative number of counts
 	std::string odom_topic;
@@ -55,22 +55,18 @@ private:
 	std::string odom_frame ;
 	
 	//count or pulse values received from the subscriber, depending on where we are subscribing
-	int left_count;
-	int right_count;
+	double left_count;
+	double right_count;
 	//previous pulse values, used to calculate the elapsed pulses in case we are subscribing to the absolute topic
 	int prev_l_pulses;
 	int prev_r_pulses;
 	//
-	//Absolute count values, calculated only in case we are subscribing to the relative topic
+	//Absolute count values, used only in case we are subscribing to the absolute topic
 	int left_count_abs;
 	int right_count_abs;
 	//Variables for wrapping
-	int prev_l_enc;
-	int prev_r_enc;
 	double encoder_low_wrap; 
 	double encoder_high_wrap;
-	int lmult;
-	int rmult;
 	//boolean for the initialization of absolute pulse values in case of absolute subscription
 	bool abs_init ; 
 
@@ -113,12 +109,12 @@ Odometry_calc::Odometry_calc(ros::NodeHandle pn)
 	/////////////////////////////
 	pn.param("encoder_cpr", encoder_cpr, 24);
 	ROS_INFO_STREAM("encoder_cpr: " << encoder_cpr);	
-	pn.param("encoder_min", encoder_min, -65536);
+	pn.param("encoder_min", encoder_min, -2147483648.0);
 	ROS_INFO_STREAM("encoder_min: " << encoder_min);
-	pn.param("encoder_max", encoder_max, 65536);
+	pn.param("encoder_max", encoder_max, 2147483648.0);
 	ROS_INFO_STREAM("encoder_max: " << encoder_max);
-	pn.param("wrapping_enabled", wrapping_enabled, false);
- 	ROS_INFO_STREAM("wrapping_enabled: " << wrapping_enabled);
+	// pn.param("wrapping_enabled", wrapping_enabled, false);
+ // 	ROS_INFO_STREAM("wrapping_enabled: " << wrapping_enabled);
 	pn.param("wrp_lim", wrp_lim, 0.3);
  	ROS_INFO_STREAM("wrp_lim: " << wrp_lim);
 	pn.param("sub_to_abs", sub_to_abs, false);
@@ -181,16 +177,11 @@ void Odometry_calc::init_variables()
 	right_count_abs = 0;
 	abs_init = false;
 	
-	if (wrapping_enabled)
-	{
-		prev_l_enc = 0;
-		prev_r_enc = 0;
-		lmult = 0;
-		rmult = 0;
-		encoder_low_wrap = ((encoder_max - encoder_min) * wrp_lim) + encoder_min;
-		encoder_high_wrap = ((encoder_max - encoder_min) * (1.0 - wrp_lim)) + encoder_min;
-	}
 
+	encoder_low_wrap = ((encoder_max - encoder_min) * wrp_lim) + encoder_min;
+	encoder_high_wrap = ((encoder_max - encoder_min) * (1.0 - wrp_lim)) + encoder_min;
+	encoder_min = -2147483648.0;
+	encoder_max = 2147483648.0;
 	then = ros::Time::now();
 
 	x_final = 0.0;
@@ -209,9 +200,9 @@ void Odometry_calc::init_variables()
 //Update function
 void Odometry_calc::update()
 {
-	/////////////////////////////////////////////////////////////////////////
-	//In case we read absolute values, we need to calculate the pulses read//
-	/////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////////
+	//In case we read absolute values, we need to calculate the actual elapsed pulses //
+	////////////////////////////////////////////////////////////////////////////////////
 	if (sub_to_abs)
 	{
 		if (!abs_init)
@@ -223,43 +214,45 @@ void Odometry_calc::update()
 		}
 		left_count_abs = left_count;
 		right_count_abs = right_count;
-		left_count = left_count - prev_l_pulses;
-		right_count = right_count - prev_r_pulses;
+
+		//check for value wrapping, in case we exceeded +-2147M
+
+
+		//left encoder
+		if ((left_count_abs < encoder_low_wrap) && (prev_l_pulses > encoder_high_wrap))
+		{
+			left_count = (encoder_max - prev_l_pulses) + (left_count_abs - encoder_min);
+		}
+		else if ((left_count_abs > encoder_high_wrap) && (prev_l_pulses < encoder_low_wrap))
+		{
+			left_count = (encoder_max - left_count_abs) + (prev_l_pulses - encoder_min);
+		}
+		else
+		{
+			left_count = left_count_abs - prev_l_pulses;
+		}
+
+
+		//right encoder
+		if ((right_count_abs < encoder_low_wrap) && (prev_r_pulses > encoder_high_wrap))
+		{
+			right_count = (encoder_max - prev_r_pulses) + (right_count_abs - encoder_min);
+		}
+		else if ((right_count_abs > encoder_high_wrap) && (prev_r_pulses < encoder_low_wrap))
+		{
+			right_count = (encoder_max - right_count_abs) + (prev_r_pulses - encoder_min);
+		}
+		else
+		{
+			right_count = right_count_abs - prev_r_pulses;
+		}
+		
+		//setting the old abs values
 		prev_l_pulses = left_count_abs;
 		prev_r_pulses = right_count_abs;
 	}
 
-	/////////////////
-	//wrap encoders//
-	/////////////////
-	if (wrapping_enabled)
-	{
-		//left encoder
-		if ((left_count < encoder_low_wrap) && (prev_l_enc > encoder_high_wrap))
-		{
-			lmult = lmult + 1;
-			left_count = (encoder_max - prev_l_enc) + (left_count - encoder_min);
-		}
-		if ((left_count > encoder_high_wrap) && (prev_l_enc < encoder_low_wrap))
-		{
-			lmult = lmult - 1;
-			left_count = (encoder_max - left_count) + (prev_l_enc - encoder_min);
-		}
-		//right encoder
-		if ((right_count < encoder_low_wrap) && (prev_r_enc > encoder_high_wrap))
-		{
-			rmult = rmult + 1;
-			right_count = (encoder_max - prev_r_enc) + (right_count - encoder_min);
-		}
-		if ((right_count > encoder_high_wrap) && (prev_r_enc < encoder_low_wrap))
-		{
-			rmult = rmult - 1;
-			right_count = (encoder_max - right_count) + (prev_r_enc - encoder_min);
-		}
 
-		prev_l_enc = left_count;
-		prev_r_enc = right_count;
-	}
 	//////////////////////////////////////
 	//calculate current and elapsed time//
 	//////////////////////////////////////
@@ -269,19 +262,19 @@ void Odometry_calc::update()
 	/////////////////////////////////////
 	//calculate absolute encoder values//
 	/////////////////////////////////////
-	if (!sub_to_abs)
-	{	
-		if (wrapping_enabled)
-		{
-			left_count_abs = 1.0 * (left_count + lmult * (encoder_max - encoder_min));
-			right_count_abs = 1.0 * (right_count + rmult * (encoder_max - encoder_min));
-		}
-		else
-		{
-			left_count_abs += left_count;
-			right_count_abs += right_count;		
-		}
-	}
+	// if (!sub_to_abs)
+	// {	
+	// 	if (wrapping_enabled)
+	// 	{
+	// 		left_count_abs = 1.0 * (left_count + lmult * (encoder_max - encoder_min));
+	// 		right_count_abs = 1.0 * (right_count + rmult * (encoder_max - encoder_min));
+	// 	}
+	// 	else
+	// 	{
+	// 		left_count_abs += left_count;
+	// 		right_count_abs += right_count;		
+	// 	}
+	// }
 
 	//////////////////////////////////////////////////
 	//calculate the distances covered left and right//
@@ -318,7 +311,7 @@ void Odometry_calc::update()
     dr = (imu_yaw - prev_imu_yaw)/elapsed;
 	}
 
-	// //wrap values between -180 and 1800 degrees
+	//wrap angle values between -180 and 1800 degrees
 	if (theta_final > M_PI) 
 	{
 		theta_final = - M_PI + (  theta_final - M_PI );
@@ -336,11 +329,11 @@ void Odometry_calc::update()
 	////////////////
 	//debug prints//
 	////////////////
-	// ROS_INFO_STREAM("x final: " << x_final);
-	// ROS_INFO_STREAM("y final: " << y_final);
+	ROS_INFO_STREAM("x final: " << x_final);
+	ROS_INFO_STREAM("y final: " << y_final);
 	ROS_INFO_STREAM("theta_final: " << theta_final*180.0/3.14);
-	// ROS_INFO_STREAM("left_abs_hall_count: " << left_count_abs);
-	// ROS_INFO_STREAM("right_abs_hall_count: " << right_count_abs);
+	ROS_INFO_STREAM("left_abs_hall_count: " << left_count_abs);
+	ROS_INFO_STREAM("right_abs_hall_count: " << right_count_abs);
 
 }
 

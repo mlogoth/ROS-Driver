@@ -237,7 +237,7 @@ private:
 		left_cmd << "!S 2 " << (int)(left_rpm) << "\r";
 
 		// ROS_INFO_STREAM("----------------------------");
-		ROS_INFO_STREAM("Wheel Motors: right_rpm: "<<right_rpm << " - left_rpm: "<<left_rpm);
+		//ROS_INFO_STREAM("Wheel Motors: right_rpm: "<<right_rpm << " - left_rpm: "<<left_rpm);
 		
 		ser.write(right_cmd.str());
 		ser.write(left_cmd.str());
