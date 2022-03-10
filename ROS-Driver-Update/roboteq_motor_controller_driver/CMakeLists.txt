@@ -158,26 +158,6 @@ add_executable(roboteq_motor_controller_driver_node
    ${catkin_LIBRARIES}
  )
 
-
-add_executable(roboteq_motor_controller_driver_node_prismatic
- src/roboteq_motor_controller_driver_node_prismatic.cpp)
-
- add_dependencies(roboteq_motor_controller_driver_node_prismatic  roboteq_motor_controller_driver_generate_messages_cpp)
-
- target_link_libraries(roboteq_motor_controller_driver_node_prismatic
-   ${catkin_LIBRARIES}
- )
-
-
-add_executable(roboteq_motor_controller_driver_node_mower
-src/roboteq_motor_controller_driver_node_mower.cpp)
-
-add_dependencies(roboteq_motor_controller_driver_node_mower  roboteq_motor_controller_driver_generate_messages_cpp)
-
-target_link_libraries(roboteq_motor_controller_driver_node_mower
-  ${catkin_LIBRARIES}
-)
-
 add_executable(config_client
  src/config_client.cpp)
 
