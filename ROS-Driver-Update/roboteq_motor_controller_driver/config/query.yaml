@@ -20,27 +20,21 @@ wrp_lim: 0.3
 sub_to_abs: false
 imu_discarded: 100
 tf_publish: false
-odom_topic: odom
+odom_topic: $(arg pub_odom_tf)
 tf_header_frame: $(arg prefix)odom
 tf_child_frame: $(arg prefix)base_footprint
 odom_frame: $(arg prefix)odom
 
 
 
-frequencyH : 50   #higher frequency (value is in ms)
+frequencyH : 10   #higher frequency (value is in ms)
+frequencyL : 100
+
 
 queryH:
- motor_amps : ?A 
- motor_command : ?M
 # hall_count : ?BCR
 # abs_hall_count : ?CB
 # hall_speed : ?BS
- volts : ?V
- feedback : ?F 
- battery_amps : ?BA
- power : ?P          
- fault_flag : ?FF  
- sto_status : ?STT 
 #  status_flag : ?FS
 # motor_amps2 : ?MA
 # motor_command2 : ?FM
@@ -53,7 +47,17 @@ queryH:
 # fault_flag2 : ?S  
 # status_flag : ?FS
 # firmware_id : ?FID  
- encoder_count : ?C
+ encoder_speed : ?S
  encoder_count_relative : ?CR
- encoder_speed : ?S  
+ encoder_count : ?C
+   
 
+queryL:
+ motor_amps : ?A 
+ motor_command : ?M
+ volts : ?V
+ fault_flag : ?FF  
+ sto_status : ?STT
+ feedback : ?F 
+ battery_amps : ?BA
+ power : ?P 
