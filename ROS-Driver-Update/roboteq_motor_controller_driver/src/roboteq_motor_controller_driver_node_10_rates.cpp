@@ -70,7 +70,7 @@ private:
 
 //added in changes
 	ros::NodeHandle nh_priv_;
-	std::vector<int> f_list;
+	std::vector<int> f_list; //a list of frequencies for the queries to be published
 	std::vector<ros::Publisher> query_pub_;
 	ros::NodeHandle nh_;
 	ros::Timer timer_pub_;
