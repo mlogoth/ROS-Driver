@@ -25,13 +25,17 @@ tf_header_frame: $(arg prefix)odom
 tf_child_frame: $(arg prefix)base_footprint
 odom_frame: $(arg prefix)odom
 
+# Frequency in Hz
+frequency_list:
+  - 100
+  - 10
+  - 25
 
 
-frequencyH : 10   #higher frequency (value is in ms)
-frequencyL : 100
+# Queries order matches the order of the frequency list above 
+# e.g query0 corresponds to the first element in the frequency list
 
-
-queryH:
+query0:
 # hall_count : ?BCR
 # abs_hall_count : ?CB
 # hall_speed : ?BS
@@ -52,7 +56,7 @@ queryH:
  encoder_count : ?C
    
 
-queryL:
+query1:
  motor_amps : ?A 
  motor_command : ?M
  volts : ?V
@@ -61,3 +65,9 @@ queryL:
  feedback : ?F 
  battery_amps : ?BA
  power : ?P 
+ encoder_count : ?C
+
+query2:
+ motor_amps2 : ?MA
+ hall_count : ?BCR
+ abs_hall_count : ?CB

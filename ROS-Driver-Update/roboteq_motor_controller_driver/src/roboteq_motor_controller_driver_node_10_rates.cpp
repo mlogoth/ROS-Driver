@@ -65,31 +65,28 @@ private:
 	ros::Subscriber cmd_vel_channel_2_sub;
 	int rate; 
 
-	int channel_number_1;
-	int channel_number_2;
-	int frequencyH;
-	int frequencyL;
-	int frequencyG;
 
 	ros::NodeHandle nh;
 
 //added in changes
 	ros::NodeHandle nh_priv_;
-	int frequency_H_;
-	int frequency_L_;
-	std::vector<ros::Publisher> query_pub_H_;
-	std::vector<ros::Publisher> query_pub_L_;
+	std::vector<int> f_list;
+	std::vector<ros::Publisher> query_pub_;
 	ros::NodeHandle nh_;
-	ros::Timer timer_pub_H_;
-	ros::Timer timer_pub_L_;
+	ros::Timer timer_pub_;
 	serial::Serial ser_;
 	std::mutex 	locker;
-	ros::Publisher serial_read_pub_H_;
-	ros::Publisher serial_read_pub_L_;
+	ros::Publisher serial_read_pub_;
+
+	ros::NodeHandle n;
+	ros::ServiceServer configsrv;
+	ros::ServiceServer commandsrv;
+	ros::ServiceServer maintenancesrv;
+
+	std::vector<int> cum_query_size;
 
 
-	void queryCallbackH	(const ros::TimerEvent &);
-	void queryCallbackL	(const ros::TimerEvent &);
+	void queryCallback	(const ros::TimerEvent &);
 
 	void formQuery(std::string, 
 				std::map<std::string,std::string> &, 
@@ -340,12 +337,6 @@ private:
 		ser_.flush();
 	}
 
-
-	ros::NodeHandle n;
-	ros::ServiceServer configsrv;
-	ros::ServiceServer commandsrv;
-	ros::ServiceServer maintenancesrv;
-
 	bool configservice(roboteq_motor_controller_driver::config_srv::Request &request, roboteq_motor_controller_driver::config_srv::Response &response)
 	{
 		std::stringstream str;
@@ -395,48 +386,38 @@ private:
 	void run()
 	{
 		initialize_services();
-		nh_.getParam("frequencyH", frequency_H_);
-		nh_.getParam("frequencyL", frequency_L_);
+		
+		nh_.getParam("frequency_list", f_list);	
+
 		
 		std::stringstream ss_gen;
-		std::stringstream ss0_H, ss1_H;
-		if (frequency_H_ > 0){
-			
-			ss0_H << "^echof 1_";
-			ss1_H << "# c_/\"DH?\",\"?\"";
-			std::map<std::string, std::string> query_map_H;
-			formQuery("queryH", query_map_H, query_pub_H_, ss1_H);
+		ss_gen << "^echof 1_"; // Disable echo from driver
+		ss_gen << "# c_"; // Clear Buffer History of previous queries
 
-			ss1_H << "# " << frequency_H_ << "_";
-			
-			//ser_.write(ss0_H.str());
-			///ser_.write(ss1_H.str());
-			//ser_.flush();
+		for (int i = 0; i < f_list.size(); i++)
+		{		
+			if (f_list[i] > 0)
+			{
+				ss_gen << "/\"DF" << i << "?\",\"?\"";
+				std::map<std::string, std::string> query_map;
+				std::stringstream query_name;
+				query_name << "query" << i;
+				formQuery(query_name.str(), query_map, query_pub_, ss_gen);
+				ss_gen << "# " << 1000/f_list[i] << "_";
+			}
+			else
+			{
+				ROS_ERROR_STREAM(tag << "Negative frequency detected "<< f_list[i]);
+			}			
 		}
-		std::stringstream ss0_L, ss1_L;
-		if (frequency_L_ > 0){
-			
-			ss0_L << "^echof 1_";
-			ss1_L << "/\"DL?\",\"?\"";
-			std::map<std::string, std::string> query_map_L;
-			formQuery("queryL", query_map_L, query_pub_L_, ss1_L);
-
-			ss1_L << "# " << frequency_L_ << "_";
-			
-			//ser_.write(ss0_L.str());
-			//ser_.write(ss1_L.str());
-			
-		}
-		ss_gen << ss0_H.str() << ss1_H.str() << ss0_L.str() << ss1_L.str();
-		ser_.write(ss_gen.str());
-		ser_.flush();
-		serial_read_pub_H_ = nh_.advertise<std_msgs::String>("read_H", 1000);
 		
-		//ros::Duration(2).sleep();
-		if (frequency_H_ > 0){
-			timer_pub_H_ = nh_.createTimer(ros::Duration(frequency_H_/ 1000.), &RoboteqDriver::queryCallbackH, this);
-		}
-
+		ser_.write(ss_gen.str()); // Send commands and queries
+		ser_.flush();
+		serial_read_pub_ = nh_.advertise<std_msgs::String>("read_serial", 1000);
+		
+		int max_freq;
+		max_freq = *std::max_element(f_list.begin(), f_list.end());
+		timer_pub_ = nh_.createTimer(ros::Duration(1/max_freq), &RoboteqDriver::queryCallback, this);
 	}
 };
 
@@ -447,115 +428,64 @@ RoboteqDriver::RoboteqDriver(ros::NodeHandle nh, ros::NodeHandle nh_priv):
 		initialize();
 	}
 
-void RoboteqDriver::queryCallbackH(const ros::TimerEvent &){
-	int count = 0;
-	ros::Time current_time = ros::Time::now();
+void RoboteqDriver::queryCallback(const ros::TimerEvent &){
+	std_msgs::String result;
+
+	// Mutex is probably not needed in single threaded spinning
+	std::lock_guard<std::mutex> lock(locker); // Lock mutex until end of scope
+
 	if (ser_.available()){
+		result.data = ser_.read(ser_.available()); // Read all available bytes
 
-
-		std_msgs::String result;
-
-		std::lock_guard<std::mutex> lock(locker);
-
-		result.data = ser_.read(ser_.available());
-
-		// std::lock_guard<std::mutex> unlock(locker);
-
-		serial_read_pub_H_.publish(result);
+		serial_read_pub_.publish(result); // Publish raw data
 		
-		boost::replace_all(result.data, "\r", "");
-		//boost::replace_all(result.data, "+", "");
-
 		std::vector<std::string> fields;
 		
-		boost::split(fields, result.data, boost::algorithm::is_any_of("D"));
+		boost::split(fields, result.data, boost::algorithm::is_any_of("\r")); // Split by termination character "\r"
+		
 		if (fields.size() < 2){
-
-			ROS_ERROR_STREAM(tag << "High Empty data:{" << result.data << "}");
+			ROS_ERROR_STREAM(tag << "Empty data:{" << result.data << "}");
+			return;
 		}
-		else if (fields.size() >= 2){
-			std::vector<std::string> fields_H;
-			std::vector<std::string> fields_L;
-			std::vector<std::string> sub_fields_H;
-			std::vector<std::string> sub_fields_L;			
-			for (int i = fields.size() - 1; i >= 0; i--){
-				if (fields[i][0] == 'H')
-				{
-					try{
-						fields_H.clear();
-						boost::split(fields_H, fields[i], boost::algorithm::is_any_of("?"));
-						if ( fields_H.size() >= query_pub_H_.size() + 1){
-							//break;
-							if (fields_H.size() > 0){
-								for (int gg = 0; gg < fields_H.size()-1; ++gg){
-							
-									sub_fields_H.clear();
-									boost::split(sub_fields_H, fields_H[gg + 1], boost::algorithm::is_any_of(":"));
-									
-									roboteq_motor_controller_driver::channel_values msg;
-									//msg.header.stamp = current_time;
+		
+		std::vector<std::string> query_fields;
+		std::vector<std::string> sub_query_fields;
+		int frequency_index;			
+		
+		for (int i = 0; i < fields.size() - 1; i++){
+			if (fields[i].rfind("DF", 0) == 0) // if field starts with "DF"
+			{
+				frequency_index = boost::lexical_cast<int>(fields[i][2]);
+				try{
+					query_fields.clear();
+					boost::split(query_fields, fields[i], boost::algorithm::is_any_of("?"));											
+					for (int j = 1; j < query_fields.size(); j++){					
+						sub_query_fields.clear();
+						boost::split(sub_query_fields, query_fields[j], boost::algorithm::is_any_of(":"));
+						
+						roboteq_motor_controller_driver::channel_values msg;
+						for (int k = 0; k < sub_query_fields.size(); k++){
+							try{
+								msg.value.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
+							}
+							catch (const std::exception &e){
 
-									for (int j = 0; j < sub_fields_H.size(); j++){
-										try{
-											msg.value.push_back(boost::lexical_cast<int>(sub_fields_H[j]));
-										}
-										catch (const std::exception &e){
-
-											ROS_ERROR_STREAM(tag << "High Garbage data on Serial " << fields[i] << " " << fields_H[gg + 1] << " "<< sub_fields_H[j]);
-											std::cerr << e.what() << '\n';
-											break;
-										}
-									}
-									query_pub_H_[gg].publish(msg);
-								}
+								ROS_ERROR_STREAM(tag << "Garbage data on Serial " << fields[i] << "//" << query_fields[j] << "//" << sub_query_fields[k]);
+								std::cerr << e.what() << '\n';
+								break;
 							}
 						}
-					}
-					catch (const std::exception &e){
-						std::cerr << e.what() << '\n';
-						ROS_ERROR_STREAM(tag << "Finding query output in :" << fields[i]);
-						continue;
-					}
+						query_pub_[cum_query_size[frequency_index] + j-1].publish(msg);
+					}						
+					
 				}
-				else if (fields[i][0] == 'L'){
-					try{
-						fields_L.clear();
-						boost::split(fields_L, fields[i], boost::algorithm::is_any_of("?"));
-						if ( fields_L.size() >= query_pub_L_.size() + 1){
-							//break;
-							if (fields_L.size() > 0 && fields_L[0] == "L"){
-								for (int i = 0; i < fields_L.size()-1; ++i){
-									sub_fields_L.clear();
-									boost::split(sub_fields_L, fields_L[i + 1], boost::algorithm::is_any_of(":"));
-									
-									roboteq_motor_controller_driver::channel_values msg;
-									//msg.header.stamp = current_time;
-
-									for (int j = 0; j < sub_fields_L.size(); j++){
-										try{
-											msg.value.push_back(boost::lexical_cast<int>(sub_fields_L[j]));
-										}
-										catch (const std::exception &e){
-											ROS_ERROR_STREAM(tag << "Low Garbage data on Serial");
-											std::cerr << e.what() << '\n';
-										}
-									}
-									query_pub_L_[i].publish(msg);
-								}
-							}
-						}
-					}
-					catch (const std::exception &e){
-						std::cerr << e.what() << '\n';
-						ROS_ERROR_STREAM(tag << "Finding query output in :" << fields[i]);
-						continue;
-					}
+				catch (const std::exception &e){
+					std::cerr << e.what() << '\n';
+					ROS_ERROR_STREAM(tag << "Finding query output in :" << fields[i]);
+					continue;
 				}
-			}
-		}
-		else{
-			ROS_WARN_STREAM(tag << "Unknown:{" << result.data << "}");
-		}
+			}			
+		}		
 	}
 }
 
@@ -564,12 +494,23 @@ void RoboteqDriver::formQuery(std::string param,
 							std::vector<ros::Publisher> &pubs,
 							std::stringstream &ser_str){
 	nh_.getParam(param, queries);
+	int count = 0;
 	for (std::map<std::string, std::string>::iterator iter = queries.begin(); iter != queries.end(); iter++){
 		ROS_INFO_STREAM(tag << param  <<" Publish topic: " << iter->first);
 		pubs.push_back(nh_.advertise<roboteq_motor_controller_driver::channel_values>(iter->first, 100));
 
 		std::string cmd = iter->second;
 		ser_str << cmd << "_";
+		count++;
+	}
+	if (!cum_query_size.empty())
+	{
+		cum_query_size.push_back(count + cum_query_size.back());
+	}
+	else
+	{
+		cum_query_size.push_back(0);
+		cum_query_size.push_back(count);
 	}
 }
 
@@ -581,8 +522,9 @@ int main(int argc, char **argv)
 	ros::NodeHandle nh_priv("~");
 	RoboteqDriver driver(nh, nh_priv);
 
-	ros::MultiThreadedSpinner spinner(8);
-	spinner.spin();
+	//ros::MultiThreadedSpinner spinner(8);
+	//spinner.spin();
+	ros::spin(); // multithreading doesn't provide any benefit cause of mutex in callback
 	ros::waitForShutdown();
 
 	return 0;
