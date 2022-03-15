@@ -110,21 +110,67 @@ private:
 			ROS_INFO_STREAM("No channel mode was selected. Assigning driver as dual.");
 			channel_mode = "dual";
 		}
-		if ((channel_mode ==   "dual") && (!nh_.getParam("motor_type", motor_type)))
+		
+		if (channel_mode ==  "dual")
 		{
-			ROS_INFO_STREAM("No valid general motor type was selected. Assigning skid_steering.");
-			motor_type = "skid_steering";
+			if (!nh_.getParam("motor_type", motor_type))
+			{
+				ROS_INFO_STREAM("No valid general motor type was selected. Assigning skid_steering and checking for individual motor types.");
+				motor_type = "skid_steering";
+				if (!nh_.getParam("motor_1_type", motor_1_type))
+				{
+					ROS_INFO_STREAM("No valid type was found for motor 1. Assigning set_speed");
+					motor_1_type = "set_speed";
+				}
+				if (!nh_.getParam("motor_2_type", motor_2_type))
+				{
+					ROS_INFO_STREAM("No valid type was found for motor 2. Assigning set_speed");
+					motor_2_type = "set_speed";
+				}
+			}
+			else
+			{
+				motor_1_type = motor_type;
+				motor_2_type = motor_type;
+			}
 		}
-		if ((channel_mode == "single") && (!nh_.getParam("motor_1_type", motor_1_type)))
+		else // single 
 		{
-			ROS_ERROR_STREAM("No motor type was found for motor 1. Shutting down.");
-			ros::shutdown();
+			if (!nh_.getParam("motor_1_type", motor_type))
+			{
+				ROS_INFO_STREAM("No valid type was found for motor 1. Assigning set_speed");
+				motor_1_type = "set_speed";
+			}
+			if (!nh_.getParam("motor_2_type", motor_type))
+			{
+				ROS_INFO_STREAM("No valid type was found for motor 2. Assigning set_speed");
+				motor_2_type = "set_speed";
+			}
 		}
-		if ((channel_mode == "single") && (!nh_.getParam("motor_2_type", motor_2_type)))
-		{
-			ROS_ERROR_STREAM("No motor type was found for motor 2. Shutting down.");
-			ros::shutdown();
-		}
+
+		
+		// if ((channel_mode == "dual") && (!nh_.getParam("motor_1_type", motor_1_type)) && motor_type !="skid_steering")
+		// {
+		// 	ROS_ERROR_STREAM("No motor type was found for motor 1. Shutting down.");
+		// 	ros::shutdown();
+		// }
+		// if ((channel_mode == "dual") && (!nh_.getParam("motor_2_type", motor_2_type)) && motor_type !="skid_steering")
+		// {
+		// 	ROS_ERROR_STREAM("No motor type was found for motor 2. Shutting down.");
+		// 	ros::shutdown();
+		// }
+
+
+		// if ((channel_mode == "single") && (!nh_.getParam("motor_1_type", motor_1_type)))
+		// {
+		// 	ROS_ERROR_STREAM("No motor type was found for motor 1. Shutting down.");
+		// 	ros::shutdown();
+		// }
+		// if ((channel_mode == "single") && (!nh_.getParam("motor_2_type", motor_2_type)))
+		// {
+		// 	ROS_ERROR_STREAM("No motor type was found for motor 2. Shutting down.");
+		// 	ros::shutdown();
+		// }
 
 		if (motor_type == "skid_steering")
 		{
@@ -141,25 +187,23 @@ private:
 		else if (channel_mode == "dual")
 		{
 			ROS_INFO_STREAM("Driver controls two motors with a single value.");
-			if (motor_1_type == "set_speed")
+			cmd_vel_channel_1_sub = nh_.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);
+			cmd_vel_channel_2_sub = nh_.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);
+			if ((motor_1_type == "set_speed") || (motor_type == "set_speed"))
 			{
 				ROS_INFO_STREAM("Motor 1 is operating in closed loop mode.");
-				cmd_vel_channel_1_sub = nh_.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);				
 			}
 			else
 			{
 				ROS_INFO_STREAM("Motor 1 is operating in open loop mode.");
-				cmd_vel_channel_1_sub = nh_.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);
 			}
-			if (motor_2_type == "set_speed")
+			if ((motor_2_type == "set_speed") || (motor_type == "set_speed"))
 			{
 				ROS_INFO_STREAM("Motor 2 is operating in closed loop mode.");
-				cmd_vel_channel_2_sub = nh_.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);				
 			}
 			else
 			{
 				ROS_INFO_STREAM("Motor 2 is operating in open loop mode.");
-				cmd_vel_channel_2_sub = nh_.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);
 			}
 		}
 		else if (channel_mode == "single")
@@ -304,6 +348,7 @@ private:
 		int cmd = msg.data;
 
 		std::stringstream channel_1_cmd;
+		
 
 		if (motor_1_type == "go_to_speed")
 		{
@@ -313,6 +358,12 @@ private:
 		{
 			channel_1_cmd << "!S 1 " << cmd << "\r";			
 		}
+
+		else {
+			ROS_ERROR("Channel 1: Not Valid Motor Type");
+		}
+
+		std::cout << "-- Channel 1 Callback: Type: "<<motor_1_type <<  "| CMD: "<< cmd << "|Channel Command: " << channel_1_cmd.str()<< std::endl;
 
 		ser_.write(channel_1_cmd.str());
 		ser_.flush();
@@ -333,7 +384,11 @@ private:
 		{
 			channel_2_cmd << "!S 2 " << cmd << "\r";			
 		}
+		else {
+			ROS_ERROR("Channel 2: Not Valid Motor Type");
+		}
 
+		std::cout << "-- Channel 2 Callback: Type: "<<motor_2_type <<  "|CMD: "<< cmd << "|Channel Command: " << channel_2_cmd.str()<< std::endl;
 		ser_.write(channel_2_cmd.str());
 		ser_.flush();
 	}
