@@ -329,11 +329,11 @@ void Odometry_calc::update()
 	////////////////
 	//debug prints//
 	////////////////
-	ROS_INFO_STREAM("x final: " << x_final);
-	ROS_INFO_STREAM("y final: " << y_final);
-	ROS_INFO_STREAM("theta_final: " << theta_final*180.0/3.14);
-	ROS_INFO_STREAM("left_abs_hall_count: " << left_count_abs);
-	ROS_INFO_STREAM("right_abs_hall_count: " << right_count_abs);
+	// ROS_INFO_STREAM("x final: " << x_final);
+	// ROS_INFO_STREAM("y final: " << y_final);
+	// ROS_INFO_STREAM("theta_final: " << theta_final*180.0/3.14);
+	// ROS_INFO_STREAM("left_abs_hall_count: " << left_count_abs);
+	// ROS_INFO_STREAM("right_abs_hall_count: " << right_count_abs);
 
 }
 

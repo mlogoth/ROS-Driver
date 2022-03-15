@@ -27,20 +27,26 @@ tf_child_frame: $(arg prefix)base_footprint
 
 
 
-frequencyH : 50   #higher frequency (value is in ms)
+#frequencyH : 50   #higher frequency (value is in ms)
 
-queryH:
- motor_amps : ?A 
- motor_command : ?M
- hall_count : ?BCR
- abs_hall_count : ?CB
- hall_speed : ?BS
- volts : ?V
- feedback : ?F 
- battery_amps : ?BA
- power : ?P          
- fault_flag : ?FF  
- sto_status : ?STT 
+frequency_list:
+ - 30
+ - 10
+# - 10
+
+
+# queryH:
+#  motor_amps : ?A 
+#  motor_command : ?M
+#  hall_count : ?BCR
+#  abs_hall_count : ?CB
+#  hall_speed : ?BS
+#  volts : ?V
+#  feedback : ?F 
+#  battery_amps : ?BA
+#  power : ?P          
+#  fault_flag : ?FF  
+#  sto_status : ?STT 
 #  status_flag : ?FS
 # motor_amps2 : ?MA
 # motor_command2 : ?FM
@@ -56,3 +62,27 @@ queryH:
 # encoder_count : ?C
 # encoder_speed : ?S  
 
+query0:
+  hall_count : ?BCR
+  abs_hall_count : ?CB
+
+
+
+query1:
+ motor_amps : ?A 
+ motor_command : ?M
+
+
+
+# query2:
+#  power : ?P          
+#  fault_flag : ?FF  
+#  sto_status : ?STT
+
+
+
+# query3:
+#  battery_amps : ?BA
+#  hall_speed : ?BS
+#  volts : ?V
+#  feedback : ?F 
