@@ -336,7 +336,6 @@ private:
 			right_cmd << "!S 2 " << cmd << "\r";
 			left_cmd << "!S 1 " << cmd << "\r";			
 		}
-
 		ser_.write(right_cmd.str());
 		ser_.write(left_cmd.str());
 		ser_.flush();
@@ -363,7 +362,7 @@ private:
 			ROS_ERROR("Channel 1: Not Valid Motor Type");
 		}
 
-		std::cout << "-- Channel 1 Callback: Type: "<<motor_1_type <<  "| CMD: "<< cmd << "|Channel Command: " << channel_1_cmd.str()<< std::endl;
+		//std::cout << "-- Channel 1 Callback: Type: "<<motor_1_type <<  "| CMD: "<< cmd << "|Channel Command: " << channel_1_cmd.str()<< std::endl;
 
 		ser_.write(channel_1_cmd.str());
 		ser_.flush();
@@ -388,7 +387,10 @@ private:
 			ROS_ERROR("Channel 2: Not Valid Motor Type");
 		}
 
-		std::cout << "-- Channel 2 Callback: Type: "<<motor_2_type <<  "|CMD: "<< cmd << "|Channel Command: " << channel_2_cmd.str()<< std::endl;
+		//std::cout << "-- Channel 2 Callback: Type: "<<motor_2_type <<  "|CMD: "<< cmd << "|Channel Command: " << channel_2_cmd.str()<< std::endl;
+		
+		// ser_.write("!AC 2 2000_");
+		// ser_.write("!DC 2 50_");
 		ser_.write(channel_2_cmd.str());
 		ser_.flush();
 	}

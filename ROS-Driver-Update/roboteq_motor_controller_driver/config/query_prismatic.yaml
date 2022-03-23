@@ -1,4 +1,4 @@
-port: "/dev/ttyS0"
+port: $(arg driver_port)
 baud: 115200
 
 frequency_list: [10] #higher frequency (value is in ms)

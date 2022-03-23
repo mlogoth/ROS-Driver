@@ -343,7 +343,6 @@ void Odometry_calc::TfPub()
 	//set up and publish transformation//
 	/////////////////////////////////////
 	geometry_msgs::TransformStamped odom_trans;
-	odom_quat = tf::createQuaternionMsgFromYaw(theta_final);
 	odom_trans.header.stamp = now;
 	odom_trans.header.frame_id = tf_header_frame; //originally was set to odom
 	odom_trans.child_frame_id = tf_child_frame;
@@ -359,6 +358,7 @@ void Odometry_calc::OdomPub()
 	///////////////////////////////
 	//set up and publish odometry//
 	///////////////////////////////
+	odom_quat = tf::createQuaternionMsgFromYaw(theta_final);
 	nav_msgs::Odometry odom;
 	odom.header.stamp = now;
 	odom.header.frame_id = odom_frame;
@@ -391,11 +391,11 @@ void Odometry_calc::encoderBCR(const roboteq_motor_controller_driver::channel_va
 	right_count = ticks.value[0];
 	left_count = ticks.value[1];
 	update();
+	OdomPub();
 	if (tf_publish)
 	{
 		TfPub();
 	}
-	OdomPub();
 }
 
 void Odometry_calc::imu_setup()
