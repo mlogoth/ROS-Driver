@@ -259,15 +259,22 @@ void Odometry_calc::update()
 	now = ros::Time::now();
 	elapsed = now.toSec() - then.toSec();
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////
-	//calculate absolute encoder values, if not subscribed to absolute. For test and debugging only//
-	/////////////////////////////////////////////////////////////////////////////////////////////////
-	if (!sub_to_abs)
-	{	
-
-		left_count_abs += left_count;
-		right_count_abs += right_count;		
-	}
+	/////////////////////////////////////
+	//calculate absolute encoder values//
+	/////////////////////////////////////
+	// if (!sub_to_abs)
+	// {	
+	// 	if (wrapping_enabled)
+	// 	{
+	// 		left_count_abs = 1.0 * (left_count + lmult * (encoder_max - encoder_min));
+	// 		right_count_abs = 1.0 * (right_count + rmult * (encoder_max - encoder_min));
+	// 	}
+	// 	else
+	// 	{
+	// 		left_count_abs += left_count;
+	// 		right_count_abs += right_count;		
+	// 	}
+	// }
 
 	//////////////////////////////////////////////////
 	//calculate the distances covered left and right//
@@ -299,9 +306,9 @@ void Odometry_calc::update()
 	}
 	else
 	{
-		//ROS_INFO_STREAM("Using imu for yaw.");
+		//ROS_INFO_STREAM("using imu88888888888888888888888888888888888888888888888888888888");
 		theta_final = imu_yaw;
-    	dr = (imu_yaw - prev_imu_yaw)/elapsed;
+    dr = (imu_yaw - prev_imu_yaw)/elapsed;
 	}
 
 	//wrap angle values between -180 and 1800 degrees
@@ -322,11 +329,11 @@ void Odometry_calc::update()
 	////////////////
 	//debug prints//
 	////////////////
-	ROS_INFO_STREAM("x final: " << x_final);
-	ROS_INFO_STREAM("y final: " << y_final);
-	ROS_INFO_STREAM("theta_final: " << theta_final*180.0/3.14);
-	ROS_INFO_STREAM("left_abs_hall_count: " << left_count_abs);
-	ROS_INFO_STREAM("right_abs_hall_count: " << right_count_abs);
+	// ROS_INFO_STREAM("x final: " << x_final);
+	// ROS_INFO_STREAM("y final: " << y_final);
+	// ROS_INFO_STREAM("theta_final: " << theta_final*180.0/3.14);
+	// ROS_INFO_STREAM("left_abs_hall_count: " << left_count_abs);
+	// ROS_INFO_STREAM("right_abs_hall_count: " << right_count_abs);
 
 }
 
@@ -336,7 +343,6 @@ void Odometry_calc::TfPub()
 	//set up and publish transformation//
 	/////////////////////////////////////
 	geometry_msgs::TransformStamped odom_trans;
-	odom_quat = tf::createQuaternionMsgFromYaw(theta_final);
 	odom_trans.header.stamp = now;
 	odom_trans.header.frame_id = tf_header_frame; //originally was set to odom
 	odom_trans.child_frame_id = tf_child_frame;
@@ -352,6 +358,7 @@ void Odometry_calc::OdomPub()
 	///////////////////////////////
 	//set up and publish odometry//
 	///////////////////////////////
+	odom_quat = tf::createQuaternionMsgFromYaw(theta_final);
 	nav_msgs::Odometry odom;
 	odom.header.stamp = now;
 	odom.header.frame_id = odom_frame;
@@ -384,11 +391,11 @@ void Odometry_calc::encoderBCR(const roboteq_motor_controller_driver::channel_va
 	right_count = ticks.value[0];
 	left_count = ticks.value[1];
 	update();
+	OdomPub();
 	if (tf_publish)
 	{
 		TfPub();
 	}
-	OdomPub();
 }
 
 void Odometry_calc::imu_setup()

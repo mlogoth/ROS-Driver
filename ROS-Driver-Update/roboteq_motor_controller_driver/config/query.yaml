@@ -19,11 +19,18 @@ imu_topic: $(arg imu_topic)
 wrp_lim: 0.3
 sub_to_abs: false
 imu_discarded: 100
-tf_publish: false
-odom_topic: $(arg pub_odom_tf)
+tf_publish: $(arg pub_odom_tf)
+odom_topic: $(arg odom_topic)
 tf_header_frame: $(arg prefix)odom
 tf_child_frame: $(arg prefix)base_footprint
 odom_frame: $(arg prefix)odom
+
+
+channel_mode: dual
+motor_type: skid_steering
+# motor_1_type: skid_steering
+# motor_2_type: skid_steering
+
 
 # Frequency in Hz
 frequency_list:
