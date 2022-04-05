@@ -61,6 +61,7 @@ add_service_files(
    config_srv.srv
    command_srv.srv
    maintenance_srv.srv
+   srv_wrapper.srv
 #   Service2.srv
  )
 

@@ -398,7 +398,7 @@ private:
 	{
 		std::stringstream str;
 		str << "^" << request.userInput << " " << request.channel << " " << request.value << "_ "
-			<< "%\clsav321654987";
+			<< "%\clsav321654987_";
 		ser_.write(str.str());
 		ser_.flush();
 		response.result = str.str();
