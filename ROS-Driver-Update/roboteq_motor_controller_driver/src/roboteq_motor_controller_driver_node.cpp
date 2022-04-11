@@ -26,16 +26,16 @@
 #include <roboteq_motor_controller_driver/command_srv.h>
 #include <roboteq_motor_controller_driver/maintenance_srv.h>
 
+template <typename T> float sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
 
-
-static const std::string tag {"[RoboteQ] "};
-
+static const std::string tag{"[RoboteQ] "};
 
 class RoboteqDriver
 {
 public:
-	RoboteqDriver( ros::NodeHandle nh, ros::NodeHandle nh_priv );
-
+	RoboteqDriver(ros::NodeHandle nh, ros::NodeHandle nh_priv);
 
 	~RoboteqDriver()
 	{
@@ -51,7 +51,8 @@ private:
 	int32_t baud;
 	double wheel_circumference;
 	double track_width;
-	double max_vel;
+	double max_vel_x;
+	double max_vel_ang;
 	int max_rpm;
 	double reduction_ratio;
 	ros::Publisher read_publisher;
@@ -59,24 +60,25 @@ private:
 
 	std::string motor_type;
 	std::string motor_1_type;
-	std::string motor_2_type;	
+	std::string motor_2_type;
 	std::string channel_mode;
+
+	bool safe_speed;
 	ros::Subscriber cmd_vel_channel_1_sub;
 	ros::Subscriber cmd_vel_channel_2_sub;
 	int rate;
 	ros::Time previous_time;
 
-
 	ros::NodeHandle nh;
 
-//added in changes
+	// added in changes
 	ros::NodeHandle nh_priv_;
-	std::vector<int> f_list; //a list of frequencies for the queries to be published
+	std::vector<int> f_list; // a list of frequencies for the queries to be published
 	std::vector<ros::Publisher> query_pub_;
 	ros::NodeHandle nh_;
 	ros::Timer timer_pub_;
 	serial::Serial ser_;
-	std::mutex 	locker;
+	std::mutex locker;
 	ros::Publisher serial_read_pub_;
 
 	ros::NodeHandle n;
@@ -86,13 +88,12 @@ private:
 
 	std::vector<int> cum_query_size;
 
+	void queryCallback(const ros::TimerEvent &);
 
-	void queryCallback	(const ros::TimerEvent &);
-
-	void formQuery(std::string, 
-				std::map<std::string,std::string> &, 
-				std::vector<ros::Publisher> &,
-				std::stringstream &);
+	void formQuery(std::string,
+				   std::map<std::string, std::string> &,
+				   std::vector<ros::Publisher> &,
+				   std::stringstream &);
 
 	void initialize()
 	{
@@ -102,7 +103,7 @@ private:
 
 		if (!nh_.getParam("rate", rate))
 		{
-			rate = 5; 
+			rate = 5;
 		}
 
 		if (!nh_.getParam("channel_mode", channel_mode))
@@ -110,8 +111,14 @@ private:
 			ROS_INFO_STREAM("No channel mode was selected. Assigning driver as dual.");
 			channel_mode = "dual";
 		}
-		
-		if (channel_mode ==  "dual")
+
+		if (!nh_.getParam("safe_speed", safe_speed))
+		{
+
+			safe_speed = false;
+		}
+
+		if (channel_mode == "dual")
 		{
 			if (!nh_.getParam("motor_type", motor_type))
 			{
@@ -134,7 +141,7 @@ private:
 				motor_2_type = motor_type;
 			}
 		}
-		else // single 
+		else // single
 		{
 			if (!nh_.getParam("motor_1_type", motor_type))
 			{
@@ -148,7 +155,6 @@ private:
 			}
 		}
 
-		
 		// if ((channel_mode == "dual") && (!nh_.getParam("motor_1_type", motor_1_type)) && motor_type !="skid_steering")
 		// {
 		// 	ROS_ERROR_STREAM("No motor type was found for motor 1. Shutting down.");
@@ -159,7 +165,6 @@ private:
 		// 	ROS_ERROR_STREAM("No motor type was found for motor 2. Shutting down.");
 		// 	ros::shutdown();
 		// }
-
 
 		// if ((channel_mode == "single") && (!nh_.getParam("motor_1_type", motor_1_type)))
 		// {
@@ -175,7 +180,16 @@ private:
 		if (motor_type == "skid_steering")
 		{
 			nh_.getParam("track_width", track_width);
-			nh_.getParam("max_vel", max_vel);
+
+			if (!nh_.getParam("max_vel_x", max_vel_x))
+			{
+				max_vel_x = 0.5;
+			}
+			
+			if (!nh_.getParam("max_vel_ang", max_vel_ang))
+			{
+				max_vel_ang = 0.5;
+			}
 			if (!nh_.getParam("reduction_ratio", reduction_ratio))
 			{
 				reduction_ratio = 70;
@@ -212,7 +226,7 @@ private:
 			if (motor_1_type == "set_speed")
 			{
 				ROS_INFO_STREAM("Motor 1 is operating in closed loop mode.");
-				cmd_vel_channel_1_sub = nh_.subscribe("chan_1_set_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);				
+				cmd_vel_channel_1_sub = nh_.subscribe("chan_1_set_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);
 			}
 			else
 			{
@@ -222,7 +236,7 @@ private:
 			if (motor_2_type == "set_speed")
 			{
 				ROS_INFO_STREAM("Motor 2 is operating in closed loop mode.");
-				cmd_vel_channel_2_sub = nh_.subscribe("chan_2_set_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);				
+				cmd_vel_channel_2_sub = nh_.subscribe("chan_2_set_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);
 			}
 			else
 			{
@@ -230,7 +244,6 @@ private:
 				cmd_vel_channel_2_sub = nh_.subscribe("chan_2_go_to_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);
 			}
 		}
-
 
 		connect();
 	}
@@ -242,7 +255,7 @@ private:
 		{
 
 			ser_.setPort(port);
-			ser_.setBaudrate(baud); //get baud as param
+			ser_.setBaudrate(baud); // get baud as param
 			serial::Timeout to = serial::Timeout::simpleTimeout(10);
 			ser_.setTimeout(to);
 			ser_.open();
@@ -268,33 +281,59 @@ private:
 	}
 
 	void skid_steering_vel_callback(const geometry_msgs::Twist &msg)
-	{	 
+	{
+
+		// max linear speed and angular
+		/* 
+		max_wheel_speed = wheel_circumference*max_rpm/(reduction_ratio*60)
+		max_linear_speed = 0.5 * max_wheel_speed
+		max_angular_speed = 0.5 * 2.0*max_wheel_speed/track_width
+		*/ 
+
+		double a = 1.0;
+
+		if (!nh_.getParam("safe_speed", safe_speed))
+		{
+
+			safe_speed = false;
+		}
+		if (safe_speed){
+			ROS_WARN_STREAM("Robot Speed in safe Mode!");
+			a = 0.6;
+		}
+		// std::cout << "a: "<< a << std::endl;
+		double vw = a*msg.angular.z; 
+		double vx = a*msg.linear.x;
+		// std::cout << "Initial Linear: "<<msg.linear.x<<"| angular: "<<msg.angular.z << std::endl;
+		// std::cout << "vx: "<< vx << std::endl;
+		// std::cout << "vw: "<< vw << std::endl;
+		if (fabs(vx) > max_vel_x)
+		{
+			vx = sgn(vx)*max_vel_x;
+		}
+
+		if (fabs(vw) > max_vel_ang)
+		{
+			vw = sgn(vw)*max_vel_ang;
+		}
+
 		// wheel speed (m/s)
-		double right_speed = msg.linear.x - track_width * msg.angular.z / 2.0;
-		double left_speed = msg.linear.x + track_width * msg.angular.z / 2.0;
+		double right_speed = vx - track_width * vw / 2.0;
+		double left_speed = vx + track_width * vw / 2.0;
 
 		// ROS_INFO_STREAM("================================");
 		// ROS_INFO_STREAM("right_speed: " << right_speed);
 		// ROS_INFO_STREAM("left_speed: " << left_speed);
+		
 
-		// set maximum linear speed at 0.35 m/s (4500rpm in motor)
-		if (fabs(right_speed) > max_vel)
-		{
-			if (right_speed > 0) {right_speed = max_vel;}
-			else {right_speed = -max_vel;}
-		}
-		if (fabs(left_speed) > max_vel)
-		{
-			if (left_speed > 0) {left_speed = max_vel;}
-			else {left_speed = -max_vel;}
-		}
+		
 		// std::stringstream cmd_sub;
 		// ROS_INFO_STREAM("================================");
 		// ROS_INFO_STREAM("right_speed: " << right_speed);
 		// ROS_INFO_STREAM("left_speed: " << left_speed);
 
-		int32_t right_rpm = (right_speed * reduction_ratio * 60) / (wheel_circumference);
-    	int32_t left_rpm = (left_speed * reduction_ratio * 60) / (wheel_circumference);
+		int32_t right_rpm = (right_speed * reduction_ratio * 60.0) / (wheel_circumference);
+		int32_t left_rpm = (left_speed * reduction_ratio * 60.0) / (wheel_circumference);
 
 		// ROS_INFO_STREAM(reduction_ratio);
 		// ROS_INFO_STREAM("================================");
@@ -308,15 +347,15 @@ private:
 		left_cmd << "!S 2 " << (int)(left_rpm) << "\r";
 
 		// ROS_INFO_STREAM("----------------------------");
-		//ROS_INFO_STREAM("Wheel Motors: right_rpm: "<<right_rpm << " - left_rpm: "<<left_rpm);
-		
+		// ROS_INFO_STREAM("Wheel Motors: right_rpm: "<<right_rpm << " - left_rpm: "<<left_rpm);
+
 		ser_.write(right_cmd.str());
 		ser_.write(left_cmd.str());
 		ser_.flush();
 	}
 
 	void dual_vel_callback(const std_msgs::Int16 &msg)
-	{	 
+	{
 		// wheel speed (m/s)
 		int cmd = msg.data;
 
@@ -329,12 +368,12 @@ private:
 		if (motor_type == "go_to_speed")
 		{
 			right_cmd << "!G 2 " << cmd << "\r";
-			left_cmd << "!G 1 " << cmd << "\r";			
+			left_cmd << "!G 1 " << cmd << "\r";
 		}
 		else if (motor_type == "set_speed")
 		{
 			right_cmd << "!S 2 " << cmd << "\r";
-			left_cmd << "!S 1 " << cmd << "\r";			
+			left_cmd << "!S 1 " << cmd << "\r";
 		}
 		ser_.write(right_cmd.str());
 		ser_.write(left_cmd.str());
@@ -342,34 +381,34 @@ private:
 	}
 
 	void channel_1_vel_callback(const std_msgs::Int16 &msg)
-	{	 
+	{
 		// wheel speed (m/s)
 		int cmd = msg.data;
 
 		std::stringstream channel_1_cmd;
-		
 
 		if (motor_1_type == "go_to_speed")
 		{
-			channel_1_cmd << "!G 1 " << cmd << "\r";			
+			channel_1_cmd << "!G 1 " << cmd << "\r";
 		}
 		else if (motor_1_type == "set_speed")
 		{
-			channel_1_cmd << "!S 1 " << cmd << "\r";			
+			channel_1_cmd << "!S 1 " << cmd << "\r";
 		}
 
-		else {
+		else
+		{
 			ROS_ERROR("Channel 1: Not Valid Motor Type");
 		}
 
-		//std::cout << "-- Channel 1 Callback: Type: "<<motor_1_type <<  "| CMD: "<< cmd << "|Channel Command: " << channel_1_cmd.str()<< std::endl;
+		// std::cout << "-- Channel 1 Callback: Type: "<<motor_1_type <<  "| CMD: "<< cmd << "|Channel Command: " << channel_1_cmd.str()<< std::endl;
 
 		ser_.write(channel_1_cmd.str());
 		ser_.flush();
 	}
 
 	void channel_2_vel_callback(const std_msgs::Int16 &msg)
-	{	 
+	{
 		// wheel speed (m/s)
 		int cmd = msg.data;
 
@@ -377,18 +416,19 @@ private:
 
 		if (motor_2_type == "go_to_speed")
 		{
-			channel_2_cmd << "!G 2 " << cmd << "\r";			
+			channel_2_cmd << "!G 2 " << cmd << "\r";
 		}
 		else if (motor_2_type == "set_speed")
 		{
-			channel_2_cmd << "!S 2 " << cmd << "\r";			
+			channel_2_cmd << "!S 2 " << cmd << "\r";
 		}
-		else {
+		else
+		{
 			ROS_ERROR("Channel 2: Not Valid Motor Type");
 		}
 
-		//std::cout << "-- Channel 2 Callback: Type: "<<motor_2_type <<  "|CMD: "<< cmd << "|Channel Command: " << channel_2_cmd.str()<< std::endl;
-		
+		// std::cout << "-- Channel 2 Callback: Type: "<<motor_2_type <<  "|CMD: "<< cmd << "|Channel Command: " << channel_2_cmd.str()<< std::endl;
+
 		// ser_.write("!AC 2 2000_");
 		// ser_.write("!DC 2 50_");
 		ser_.write(channel_2_cmd.str());
@@ -444,16 +484,15 @@ private:
 	void run()
 	{
 		initialize_services();
-		
-		nh_.getParam("frequency_list", f_list);	
 
-		
+		nh_.getParam("frequency_list", f_list);
+
 		std::stringstream ss_gen;
 		ss_gen << "^echof 1_"; // Disable echo from driver
-		ss_gen << "# c_"; // Clear Buffer History of previous queries
+		ss_gen << "# c_";	   // Clear Buffer History of previous queries
 
 		for (int i = 0; i < f_list.size(); i++)
-		{		
+		{
 			if (f_list[i] > 0)
 			{
 				ROS_INFO_STREAM(tag << "frequency " << i << " " << f_list[i]);
@@ -462,35 +501,35 @@ private:
 				std::stringstream query_name;
 				query_name << "query" << i;
 				formQuery(query_name.str(), query_map, query_pub_, ss_gen);
-				ss_gen << "# " << 1000/f_list[i] << "_";
+				ss_gen << "# " << 1000 / f_list[i] << "_";
 			}
 			else
 			{
 				ROS_ERROR_STREAM(tag << "Negative frequency detected " << f_list[i]);
-			}			
+			}
 		}
-		
+
 		ser_.write(ss_gen.str()); // Send commands and queries
 		ser_.flush();
 		ROS_INFO_STREAM(tag << ss_gen.str());
 		serial_read_pub_ = nh_.advertise<std_msgs::String>("read_serial", 1000);
-		
+
 		double max_freq;
 		max_freq = *std::max_element(f_list.begin(), f_list.end());
 		ROS_INFO_STREAM(tag << " max frequency " << max_freq);
 		previous_time = ros::Time::now();
-		timer_pub_ = nh_.createTimer(ros::Duration(double(1.0/max_freq)), &RoboteqDriver::queryCallback, this);
+		timer_pub_ = nh_.createTimer(ros::Duration(double(1.0 / max_freq)), &RoboteqDriver::queryCallback, this);
 	}
 };
 
-RoboteqDriver::RoboteqDriver(ros::NodeHandle nh, ros::NodeHandle nh_priv):
-	nh_(nh),
-	nh_priv_(nh_priv)
-	{
-		initialize();
-	}
+RoboteqDriver::RoboteqDriver(ros::NodeHandle nh, ros::NodeHandle nh_priv) : nh_(nh),
+																			nh_priv_(nh_priv)
+{
+	initialize();
+}
 
-void RoboteqDriver::queryCallback(const ros::TimerEvent & event){
+void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
+{
 	std_msgs::String result;
 
 	// Mutex is probably not needed in single threaded spinning
@@ -501,70 +540,80 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent & event){
 	// std::cout<<"current_expected: "<<event.current_expected.toSec()- ros::Time::now().toSec()<<std::endl;
 	// std::cout<<"Current Real: "<<event.current_real.toSec()- ros::Time::now().toSec()<<std::endl;
 
-	if (ser_.available()){
+	if (ser_.available())
+	{
 		result.data = ser_.read(ser_.available()); // Read all available bytes
 
 		serial_read_pub_.publish(result); // Publish raw data
-		
+
 		std::vector<std::string> fields;
-		
+
 		boost::split(fields, result.data, boost::algorithm::is_any_of("\r")); // Split by termination character "\r"
-		
-		if (fields.size() < 2){
+
+		if (fields.size() < 2)
+		{
 			ROS_ERROR_STREAM(tag << "Empty data:{" << result.data << "}");
 			return;
 		}
-		
+
 		std::vector<std::string> query_fields;
 		std::vector<std::string> sub_query_fields;
-		int frequency_index;			
-		
-		for (int i = 0; i < fields.size() - 1; i++){
+		int frequency_index;
+
+		for (int i = 0; i < fields.size() - 1; i++)
+		{
 			if (fields[i].rfind("DF", 0) == 0) // if field starts with "DF"
 			{
 				frequency_index = boost::lexical_cast<int>(fields[i][2]);
-				try{
+				try
+				{
 					query_fields.clear();
-					boost::split(query_fields, fields[i], boost::algorithm::is_any_of("?"));											
-					for (int j = 1; j < query_fields.size(); j++){					
+					boost::split(query_fields, fields[i], boost::algorithm::is_any_of("?"));
+					for (int j = 1; j < query_fields.size(); j++)
+					{
 						sub_query_fields.clear();
 						boost::split(sub_query_fields, query_fields[j], boost::algorithm::is_any_of(":"));
-						
+
 						roboteq_motor_controller_driver::channel_values msg;
-						for (int k = 0; k < sub_query_fields.size(); k++){
-							try{
+						for (int k = 0; k < sub_query_fields.size(); k++)
+						{
+							try
+							{
 								msg.value.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
 							}
-							catch (const std::exception &e){
+							catch (const std::exception &e)
+							{
 
 								ROS_ERROR_STREAM(tag << "Garbage data on Serial " << fields[i] << "//" << query_fields[j] << "//" << sub_query_fields[k]);
 								std::cerr << e.what() << '\n';
 								break;
 							}
 						}
-						query_pub_[cum_query_size[frequency_index] + j-1].publish(msg);
-					}						
-					
+						query_pub_[cum_query_size[frequency_index] + j - 1].publish(msg);
+					}
 				}
-				catch (const std::exception &e){
+				catch (const std::exception &e)
+				{
 					std::cerr << e.what() << '\n';
 					ROS_ERROR_STREAM(tag << "Finding query output in :" << fields[i]);
 					continue;
 				}
-			}			
-		}		
+			}
+		}
 	}
 	previous_time = ros::Time::now();
 }
 
-void RoboteqDriver::formQuery(std::string param, 
-							std::map<std::string,std::string> &queries, 
-							std::vector<ros::Publisher> &pubs,
-							std::stringstream &ser_str){
+void RoboteqDriver::formQuery(std::string param,
+							  std::map<std::string, std::string> &queries,
+							  std::vector<ros::Publisher> &pubs,
+							  std::stringstream &ser_str)
+{
 	nh_.getParam(param, queries);
 	int count = 0;
-	for (std::map<std::string, std::string>::iterator iter = queries.begin(); iter != queries.end(); iter++){
-		ROS_INFO_STREAM(tag << param  <<" Publish topic: " << iter->first);
+	for (std::map<std::string, std::string>::iterator iter = queries.begin(); iter != queries.end(); iter++)
+	{
+		ROS_INFO_STREAM(tag << param << " Publish topic: " << iter->first);
 		pubs.push_back(nh_.advertise<roboteq_motor_controller_driver::channel_values>(iter->first, 100));
 
 		std::string cmd = iter->second;
@@ -590,8 +639,8 @@ int main(int argc, char **argv)
 	ros::NodeHandle nh_priv("~");
 	RoboteqDriver driver(nh, nh_priv);
 
-	//ros::MultiThreadedSpinner spinner(8);
-	//spinner.spin();
+	// ros::MultiThreadedSpinner spinner(8);
+	// spinner.spin();
 	ros::spin(); // multithreading doesn't provide any benefit cause of mutex in callback
 	ros::waitForShutdown();
 
