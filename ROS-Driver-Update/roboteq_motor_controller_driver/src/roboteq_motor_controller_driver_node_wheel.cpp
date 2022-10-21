@@ -45,7 +45,7 @@ private:
 	double wheel_circumference;
 	double track_width;
 	double max_vel;
-	int max_rpm;
+	int max_rpm = 3500;
 	double reduction_ratio;
 	ros::Publisher read_publisher;
 	ros::Subscriber cmd_vel_sub;
@@ -103,11 +103,34 @@ private:
 		run();
 	}
 
+	void rpm_mapping(const geometry_msgs::Twist &msg)
+	{
+		double right_speed = msg.linear.x - track_width * msg.angular.z / 2.0;
+		double left_speed = msg.linear.x + track_width * msg.angular.z / 2.0;
+
+		double max_vel_wheel= (wheel_circumference*max_rpm)/(reduction_ratio * 60);
+
+		double mx = std::max(fabs(right_speed),fabs(left_speed));
+		double ln = max_vel_wheel/mx;
+
+		double right_speed_cr = ln*right_speed;
+		double left_speed_cr = ln*left_speed;
+		// std::cout<<"================================="<<std::endl;
+		// std::cout<<"max_vel_wheel: "<<max_vel_wheel<<std::endl;
+		// std::cout<<"right_speed: "<<right_speed<<std::endl;
+		// std::cout<<"left_speed: "<<left_speed<<std::endl;
+		// std::cout<<"right_speed_cr: "<<right_speed_cr<<std::endl;
+		// std::cout<<"left_speed_cr: "<<left_speed_cr<<std::endl;
+
+	}
+
 	void cmd_vel_callback(const geometry_msgs::Twist &msg)
 	{	 
 		// wheel speed (m/s)
 		double right_speed = msg.linear.x - track_width * msg.angular.z / 2.0;
 		double left_speed = msg.linear.x + track_width * msg.angular.z / 2.0;
+
+		rpm_mapping(msg);
 
 		// ROS_INFO_STREAM("================================");
 		// ROS_INFO_STREAM("right_speed:" << right_speed);

@@ -53,7 +53,7 @@ private:
 	double track_width;
 	double max_vel_x;
 	double max_vel_ang;
-	int max_rpm;
+	int max_rpm = 3500;
 	double reduction_ratio;
 	ros::Publisher read_publisher;
 	ros::Subscriber cmd_vel_sub;
@@ -280,6 +280,26 @@ private:
 		run();
 	}
 
+	void rpm_mapping(const double &right_speed, const double &left_speed, double &right_speed_cr, double &left_speed_cr)
+	{
+		double max_vel_wheel= (wheel_circumference*max_rpm)/(reduction_ratio * 60);
+
+		double mx = std::max(fabs(right_speed),fabs(left_speed));
+		double ln = 1.0;
+		if (mx>max_vel_wheel)
+			ln = max_vel_wheel/mx;
+
+		right_speed_cr = ln*right_speed;
+		left_speed_cr = ln*left_speed;
+		// std::cout<<"================================="<<std::endl;
+		// std::cout<<"max_vel_wheel: "<<max_vel_wheel<<std::endl;
+		// std::cout<<"right_speed: "<<right_speed<<std::endl;
+		// std::cout<<"left_speed: "<<left_speed<<std::endl;
+		// std::cout<<"right_speed_cr: "<<right_speed_cr<<std::endl;
+		// std::cout<<"left_speed_cr: "<<left_speed_cr<<std::endl;
+
+	}
+
 	void skid_steering_vel_callback(const geometry_msgs::Twist &msg)
 	{
 
@@ -324,16 +344,17 @@ private:
 		// ROS_INFO_STREAM("================================");
 		// ROS_INFO_STREAM("right_speed: " << right_speed);
 		// ROS_INFO_STREAM("left_speed: " << left_speed);
-		
-
+		double right_speed_cr;
+		double left_speed_cr;
+		rpm_mapping(right_speed,left_speed,right_speed_cr,left_speed_cr);
 		
 		// std::stringstream cmd_sub;
 		// ROS_INFO_STREAM("================================");
 		// ROS_INFO_STREAM("right_speed: " << right_speed);
 		// ROS_INFO_STREAM("left_speed: " << left_speed);
 
-		int32_t right_rpm = (right_speed * reduction_ratio * 60.0) / (wheel_circumference);
-		int32_t left_rpm = (left_speed * reduction_ratio * 60.0) / (wheel_circumference);
+		int32_t right_rpm = (right_speed_cr * reduction_ratio * 60.0) / (wheel_circumference);
+		int32_t left_rpm = (left_speed_cr * reduction_ratio * 60.0) / (wheel_circumference);
 
 		// ROS_INFO_STREAM(reduction_ratio);
 		// ROS_INFO_STREAM("================================");
