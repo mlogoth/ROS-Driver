@@ -124,8 +124,8 @@ private:
 	{	 
 		smooth_linear_x =  smooth_linear_x + smooth_start_factor*(msg.linear.x-smooth_linear_x);
 		smooth_angular_z = smooth_angular_z + smooth_start_factor*(msg.angular.z-smooth_angular_z);
-		float right_speed = smooth_linear_x - track_width * smooth_angular_z/ 2.0;
-		float left_speed = smooth_linear_x + track_width * smooth_angular_z / 2.0;
+		float right_speed = smooth_linear_x + track_width * smooth_angular_z/ 2.0;
+		float left_speed = smooth_linear_x - track_width * smooth_angular_z / 2.0;
 
 		// wheel speed (m/s)
 		// float right_speed = msg.linear.x - track_width * msg.angular.z / 2.0;
@@ -150,10 +150,10 @@ private:
 		
 		// int32_t right_rpm = ((right_speed / wheel_circumference) * 60.0) * reduction_ratio;
     	// int32_t left_rpm = ((left_speed / wheel_circumference) * 60.0) * reduction_ratio;
-		int32_t right_rpm = (-right_speed * reduction_ratio * 63 * 60) / (wheel_circumference * 18);
-    	int32_t left_rpm = (-left_speed * reduction_ratio * 63 * 60) / (wheel_circumference * 18);
+		int32_t right_rpm = (right_speed * reduction_ratio * 63 * 60) / (wheel_circumference * 18);
+    	int32_t left_rpm = (left_speed * reduction_ratio * 63 * 60) / (wheel_circumference * 18);
 
-		ROS_INFO_STREAM("right_rpm: "<<abs(right_rpm) << " - left_rpm: "<<abs(left_rpm));
+		ROS_INFO_STREAM("right_rpm: "<<right_rpm << " - left_rpm: "<<left_rpm);
 
 		std::stringstream right_cmd;
 		std::stringstream left_cmd;

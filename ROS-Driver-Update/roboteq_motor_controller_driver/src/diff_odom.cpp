@@ -202,9 +202,9 @@ void Odometry_calc::update()
 		{
 			// left_abs += left;
 			// ROS_INFO_STREAM("Left " << left_abs << "  right " << right_abs);
-			d_left = -left * meters_per_tick;
+			d_left = left * meters_per_tick;
 			// ROS_INFO_STREAM("Left___" << left);
-			d_right = -right * meters_per_tick;
+			d_right = right * meters_per_tick;
 		}
 
 		DeltaS = (d_left + d_right) / 2.0;

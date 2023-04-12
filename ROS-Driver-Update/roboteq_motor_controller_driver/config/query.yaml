@@ -1,4 +1,4 @@
-port : "/dev/ttyACM1"
+port : "/dev/SBL2360T"
 # port : "/dev/ttyS1"
 baud : 115200
 
