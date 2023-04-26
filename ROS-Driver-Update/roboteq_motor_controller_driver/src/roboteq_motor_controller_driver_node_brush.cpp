@@ -19,6 +19,8 @@
 #include <roboteq_motor_controller_driver/config_srv.h>
 #include <roboteq_motor_controller_driver/command_srv.h>
 #include <roboteq_motor_controller_driver/maintenance_srv.h>
+#include <sensor_msgs/JointState.h>
+#include <math.h>
 
 class RoboteqDriver_brush
 {
@@ -41,7 +43,10 @@ private:
 	std::string port;
 	int32_t baud;
 	ros::Publisher read_publisher;
+    ros::Publisher brush_state_publisher;
 	ros::Subscriber cmd_vel_sub;
+    double brush_pos, brush_vel;
+    ros::Timer brush_vel_timer;
 
 	int channel_number_1;
 	int channel_number_2;
@@ -49,6 +54,7 @@ private:
 	int frequencyL;
 	int frequencyG;
 	ros::NodeHandle nh;
+    const double brush_radius = 0.065;
 
 	void initialize()
 	{
@@ -92,6 +98,23 @@ private:
 		run();
 	}
 
+    void brush_vel_joint_state(const ros::TimerEvent& t) {
+        auto js_msg = sensor_msgs::JointState();
+        js_msg.header.stamp = ros::Time::now();
+        js_msg.name.push_back("scrufy_brush_joint");
+        js_msg.velocity.push_back(brush_vel*brush_radius*M_PI/30);
+        auto time_delta = (t.current_real - t.last_real).toSec();
+        auto new_pos = brush_pos + time_delta * js_msg.velocity[0];
+        // Handle overflows
+        if (std::abs(new_pos - brush_pos) > 100.0) {
+            brush_pos = 0.0;
+            new_pos = time_delta * js_msg.velocity[0];
+        }
+        brush_pos = new_pos;
+        js_msg.position.push_back(new_pos);
+        brush_state_publisher.publish(js_msg);
+    }
+
 	void cmd_vel_callback(const std_msgs::Int16 &msg)
 	{
 		std::stringstream cmd_sub;
@@ -117,6 +140,7 @@ private:
 
 		ser.write(cmd_sub.str());
 		ser.flush();
+        brush_vel = (double)msg.data;
 		ROS_INFO_STREAM(cmd_sub.str());
 	}
 
@@ -219,6 +243,10 @@ private:
 		ser.flush();
 		int count = 0;
 		read_publisher = nh.advertise<std_msgs::String>("read", 1000);
+        brush_state_publisher = nh.advertise<sensor_msgs::JointState>("joint_state", 1);
+        brush_vel = 0.0;
+        brush_pos = 0.0;
+        brush_vel_timer = nh.createTimer(ros::Duration(0.3), &RoboteqDriver_brush::brush_vel_joint_state, this);
 		sleep(2);
 		ros::Rate loop_rate(5);
 		while (ros::ok())
