@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   serial
   std_msgs
+  sensor_msgs
   rospy
   tf
   message_generation
@@ -109,7 +110,7 @@ generate_messages(
 catkin_package(
   INCLUDE_DIRS include
 #  LIBRARIES roboteq_motor_controller_driver
-  CATKIN_DEPENDS roscpp serial std_msgs message_runtime
+  CATKIN_DEPENDS roscpp serial std_msgs sensor_msgs message_runtime
 #  DEPENDS system_lib
 )
 
