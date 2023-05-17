@@ -1,9 +1,15 @@
-port : "/dev/ttyS1"
+port : $(arg driver_port)
 baud : 115200
 
-frequencyH : 50   #higher frequency (value is in ms)
+frequency_list: [10] #higher frequency (value is in ms)
 
-queryH:
+channel_mode: dual
+# motor_type:  set_speed
+motor_1_type: set_speed
+motor_2_type: set_speed
+
+
+query0:
  motor_amps : ?A 
  motor_command : ?M
  hall_count : ?BCR
@@ -34,4 +40,3 @@ queryH:
 # firmware_id : ?FID  
 # encoder_count : ?C
 # encoder_speed : ?S  
-

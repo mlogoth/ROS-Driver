@@ -1,11 +1,10 @@
 <launch>
+    <arg name="config_dir" default="$(find roboteq_motor_controller_driver)/config/query_mower.yaml" />
+    <arg name="driver_port" default="/dev/ttyS1"/>
 
-<rosparam command="load" file="$(find roboteq_motor_controller_driver)/config/query_mower.yaml" />
+    <group ns="mower">
+        <rosparam command="load" file="$(arg config_dir)" subst_value="true" />
+        <node name="roboteq_motor_controller_driver_mower" pkg="roboteq_motor_controller_driver" type="roboteq_motor_controller_driver_node" output="screen"></node>
+    </group>
 
-<node name = "roboteq_motor_controller_driver_mower" pkg = "roboteq_motor_controller_driver" type = "roboteq_motor_controller_driver_node_mower" output = "screen"> 
-
-
-</node>
-
- 
 </launch>
