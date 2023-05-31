@@ -1,10 +1,9 @@
 <launch>
     <arg name="config_dir" default="$(find roboteq_motor_controller_driver)/config/query_prismatic.yaml" />
     <arg name="driver_port" default="/dev/ttyS0" />
-
-    <group ns="prismatic">
-        <rosparam command="load" file="$(arg config_dir)" subst_value="true" />
-        <node name="roboteq_motor_controller_driver_prismatic" pkg="roboteq_motor_controller_driver" type="roboteq_motor_controller_driver_node" output="screen"></node>
-    </group>
+    
+    <rosparam command="load" file="$(arg config_dir)" subst_value="true" />
+    <node name="roboteq_motor_controller_driver_prismatic" pkg="roboteq_motor_controller_driver" type="roboteq_motor_controller_driver_node" output="screen">
+    </node>
 
 </launch>
