@@ -3,7 +3,7 @@
     <arg name="driver_port" default="/dev/ttyS0" />
     
     <rosparam command="load" file="$(arg config_dir)" subst_value="true" />
-    <node name="roboteq_motor_controller_driver_prismatic" pkg="roboteq_motor_controller_driver" type="roboteq_motor_controller_driver_node" output="screen">
+    <node name="roboteq_motor_controller_driver_prismatic" pkg="roboteq_motor_controller_driver" type="roboteq_motor_controller_driver_node" output="screen" respawn="true">
     </node>
 
 </launch>
