@@ -1,0 +1,23 @@
+# specify robot track width in meters
+track_width: 0.9925
+# specify reduction ratio (70:1), if there is no put 1
+reduction_ratio: 70
+# specify reduction maximum linear velocity (m/s)
+# max_vel: 0.95  # 60 m/min @3500rpm
+max_vel: 0.42  # reduced speed for testing
+# specify robot wheel circumference (perimeter) in meters 
+wheel_circumference: 1.162389 # D:37cm
+encoder_cpr: 6
+encoder_min: -65536
+encoder_max: 65536 
+rate: 20 
+enable_imu_yaw: false
+imu_topic: $(arg imu_topic)
+wrapping_enabled: false
+wrp_lim: 0.3
+sub_to_abs: true
+imu_discarded: 100
+tf_publish: false
+odom_topic: odom_noimu
+tf_header_frame: $(arg prefix)odom
+tf_child_frame: $(arg prefix)base_footprint
