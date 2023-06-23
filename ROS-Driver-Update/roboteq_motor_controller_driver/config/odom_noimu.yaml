@@ -4,13 +4,14 @@ track_width: 0.9925
 reduction_ratio: 70
 # specify reduction maximum linear velocity (m/s)
 # max_vel: 0.95  # 60 m/min @3500rpm
-max_vel: 0.42  # reduced speed for testing
+max_vel_x: 0.8  # reduced speed for testing
+max_vel_ang: 1.6 
 # specify robot wheel circumference (perimeter) in meters 
-wheel_circumference: 1.162389 # D:37cm
+wheel_circumference: 1.13914122 # D:37cm
 encoder_cpr: 6
 encoder_min: -65536
 encoder_max: 65536 
-rate: 20 
+rate: 30 
 enable_imu_yaw: false
 imu_topic: $(arg imu_topic)
 wrapping_enabled: false
