@@ -12,9 +12,9 @@
 
 <rosparam command="load" file="$(arg config_dir)" subst_value="true"/>
 
-<node name = "roboteq_motor_controller_driver" pkg = "roboteq_motor_controller_driver" type = "roboteq_motor_controller_driver_node" output = "screen" respawn="true">
+<node name = "roboteq_motor_controller_driver" pkg = "roboteq_motor_controller_driver" type = "roboteq_motor_controller_driver_node" output = "log" respawn="true">
     <param name="pub_odom_tf" value="$(arg pub_odom_tf)" />
 </node>
 
-<node name = "diff_odom" pkg = "roboteq_motor_controller_driver" type = "diff_odom" output = "screen" if="$(arg odometry_enabled)"/>
+<node name = "diff_odom" pkg = "roboteq_motor_controller_driver" type = "diff_odom" output = "log" if="$(arg odometry_enabled)"/>
 </launch>

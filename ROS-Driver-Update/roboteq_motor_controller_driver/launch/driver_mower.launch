@@ -3,6 +3,6 @@
     <arg name="driver_port" default="/dev/ttyS1"/>
 
     <rosparam command="load" file="$(arg config_dir)" subst_value="true" />
-    <node name="roboteq_motor_controller_driver_mower" pkg="roboteq_motor_controller_driver" type="roboteq_motor_controller_driver_node" output="screen" respawn="true"></node>
+    <node name="roboteq_motor_controller_driver_mower" pkg="roboteq_motor_controller_driver" type="roboteq_motor_controller_driver_node" output="log" respawn="true"></node>
 
 </launch>
