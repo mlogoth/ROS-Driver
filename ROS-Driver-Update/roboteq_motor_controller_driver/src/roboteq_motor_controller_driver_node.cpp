@@ -1,4 +1,5 @@
-// #include <roboteq_motor_controller_driver/roboteq_motor_controller_driver_node.h>
+#include <roboteq_motor_controller_driver/roboteq_motor_controller_driver_node.h>
+
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
@@ -26,281 +27,214 @@
 #include <roboteq_motor_controller_driver/command_srv.h>
 #include <roboteq_motor_controller_driver/maintenance_srv.h>
 
-template <typename T> float sgn(T val) {
-    return (T(0) < val) - (val < T(0));
-}
+using std::placeholders::_1;
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("Roboteq");
 
-static const std::string tag{"[RoboteQ] "};
-
-class RoboteqDriver
+RoboteqDriver::RoboteqDriver() : Node("roboteq_motor_controller_driver")
 {
-public:
-	RoboteqDriver(ros::NodeHandle nh, ros::NodeHandle nh_priv);
-
-	~RoboteqDriver()
+	// Declare and get arameters
+	port = this->declare_parameter<std::string>("port", "");
+	baud = this->declare_parameter<int>("baud", 0);
+	safe_speed = this->declare_parameter<bool>("safe_speed", false);
+	channel_mode = this->declare_parameter<std::string>("channel_mode", "");
+	motor_type = this->declare_parameter<std::string>("motor_type", "");
+	motor_1_type = this->declare_parameter<std::string>("motor_1_type", "");
+	motor_2_type = this->declare_parameter<std::string>("motor_2_type", "");
+	track_width = this->declare_parameter<double>("track_width", -1.0);
+	max_vel_x = this->declare_parameter<double>("max_vel_x", -1.0);
+	max_vel_ang = this->declare_parameter<double>("max_vel_ang", -1.0);
+	reduction_ratio = this->declare_parameter<double>("reduction_ratio", -1.0);
+	wheel_circumference = this->declare_parameter<double>("wheel_circumference", -1.0);
+	
+	if (channel_mode == "")
 	{
-		if (ser.isOpen())
-		{
-			ser.close();
-		}
-	}
+		RCLCPP_INFO(LOGGER, "No channel mode was selected. Assigning driver as dual.");
+		channel_mode = "dual";
+	}	
 
-private:
-	serial::Serial ser;
-	std::string port;
-	int32_t baud;
-	double wheel_circumference;
-	double track_width;
-	double max_vel_x;
-	double max_vel_ang;
-	int max_rpm = 3500;
-	double reduction_ratio;
-	ros::Publisher read_publisher;
-	ros::Subscriber cmd_vel_sub;
-
-	std::string motor_type;
-	std::string motor_1_type;
-	std::string motor_2_type;
-	std::string channel_mode;
-
-	bool safe_speed;
-	ros::Subscriber cmd_vel_channel_1_sub;
-	ros::Subscriber cmd_vel_channel_2_sub;
-	int rate;
-	ros::Time previous_time;
-
-	ros::NodeHandle nh;
-
-	// added in changes
-	ros::NodeHandle nh_priv_;
-	std::vector<int> f_list; // a list of frequencies for the queries to be published
-	std::vector<ros::Publisher> query_pub_;
-	ros::NodeHandle nh_;
-	ros::Timer timer_pub_;
-	serial::Serial ser_;
-	std::mutex locker;
-	ros::Publisher serial_read_pub_;
-
-	ros::NodeHandle n;
-	ros::ServiceServer configsrv;
-	ros::ServiceServer commandsrv;
-	ros::ServiceServer maintenancesrv;
-
-	std::vector<int> cum_query_size;
-
-	void queryCallback(const ros::TimerEvent &);
-
-	void formQuery(std::string,
-				   std::map<std::string, std::string> &,
-				   std::vector<ros::Publisher> &,
-				   std::stringstream &);
-
-	void initialize()
+	if (channel_mode == "dual")
 	{
-
-		nh_.getParam("port", port);
-		nh_.getParam("baud", baud);
-
-		if (!nh_.getParam("rate", rate))
+		if (motor_type = "")
 		{
-			rate = 5;
-		}
+			RCLCPP_INFO(LOGGER, "No valid general motor type was selected. Assigning skid_steering and checking for individual motor types.");
+			motor_type = "skid_steering";
 
-		if (!nh_.getParam("channel_mode", channel_mode))
-		{
-			ROS_INFO_STREAM("No channel mode was selected. Assigning driver as dual.");
-			channel_mode = "dual";
-		}
-
-		if (!nh_.getParam("safe_speed", safe_speed))
-		{
-
-			safe_speed = false;
-		}
-
-		if (channel_mode == "dual")
-		{
-			if (!nh_.getParam("motor_type", motor_type))
+			if (motor_1_type = "")
 			{
-				ROS_INFO_STREAM("No valid general motor type was selected. Assigning skid_steering and checking for individual motor types.");
-				motor_type = "skid_steering";
-				if (!nh_.getParam("motor_1_type", motor_1_type))
-				{
-					ROS_INFO_STREAM("No valid type was found for motor 1. Assigning set_speed");
-					motor_1_type = "set_speed";
-				}
-				if (!nh_.getParam("motor_2_type", motor_2_type))
-				{
-					ROS_INFO_STREAM("No valid type was found for motor 2. Assigning set_speed");
-					motor_2_type = "set_speed";
-				}
-			}
-			else
-			{
-				motor_1_type = motor_type;
-				motor_2_type = motor_type;
-			}
-		}
-		else // single
-		{
-			if (!nh_.getParam("motor_1_type", motor_type))
-			{
-				ROS_INFO_STREAM("No valid type was found for motor 1. Assigning set_speed");
+				RCLCPP_INFO(LOGGER, "No valid type was found for motor 1. Assigning set_speed");
 				motor_1_type = "set_speed";
 			}
-			if (!nh_.getParam("motor_2_type", motor_type))
+			if (motor_2_type = "")
 			{
-				ROS_INFO_STREAM("No valid type was found for motor 2. Assigning set_speed");
+				RCLCPP_INFO(LOGGER, "No valid type was found for motor 2. Assigning set_speed");
 				motor_2_type = "set_speed";
 			}
 		}
-
-		// if ((channel_mode == "dual") && (!nh_.getParam("motor_1_type", motor_1_type)) && motor_type !="skid_steering")
-		// {
-		// 	ROS_ERROR_STREAM("No motor type was found for motor 1. Shutting down.");
-		// 	ros::shutdown();
-		// }
-		// if ((channel_mode == "dual") && (!nh_.getParam("motor_2_type", motor_2_type)) && motor_type !="skid_steering")
-		// {
-		// 	ROS_ERROR_STREAM("No motor type was found for motor 2. Shutting down.");
-		// 	ros::shutdown();
-		// }
-
-		// if ((channel_mode == "single") && (!nh_.getParam("motor_1_type", motor_1_type)))
-		// {
-		// 	ROS_ERROR_STREAM("No motor type was found for motor 1. Shutting down.");
-		// 	ros::shutdown();
-		// }
-		// if ((channel_mode == "single") && (!nh_.getParam("motor_2_type", motor_2_type)))
-		// {
-		// 	ROS_ERROR_STREAM("No motor type was found for motor 2. Shutting down.");
-		// 	ros::shutdown();
-		// }
-
-		if (motor_type == "skid_steering")
+		else
 		{
-			nh_.getParam("track_width", track_width);
-
-			if (!nh_.getParam("max_vel_x", max_vel_x))
-			{
-				max_vel_x = 0.5;
-			}
-			
-			if (!nh_.getParam("max_vel_ang", max_vel_ang))
-			{
-				max_vel_ang = 0.5;
-			}
-			if (!nh_.getParam("reduction_ratio", reduction_ratio))
-			{
-				reduction_ratio = 70;
-			}
-			nh_.getParam("wheel_circumference", wheel_circumference);
-			ROS_INFO_STREAM("Driver controls two motors moving a skid steering vehicle.");
-			cmd_vel_sub = nh_.subscribe("cmd_vel", 10, &RoboteqDriver::skid_steering_vel_callback, this);
+			motor_1_type = motor_type;
+			motor_2_type = motor_type;
 		}
-		else if (channel_mode == "dual")
+	}
+	else // single
+	{
+		if (motor_1_type = "")
 		{
-			ROS_INFO_STREAM("Driver controls two motors with a single value.");
-			cmd_vel_channel_1_sub = nh_.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);
-			cmd_vel_channel_2_sub = nh_.subscribe("dual_cmd_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);
-			if ((motor_1_type == "set_speed") || (motor_type == "set_speed"))
-			{
-				ROS_INFO_STREAM("Motor 1 is operating in closed loop mode.");
-			}
-			else
-			{
-				ROS_INFO_STREAM("Motor 1 is operating in open loop mode.");
-			}
-			if ((motor_2_type == "set_speed") || (motor_type == "set_speed"))
-			{
-				ROS_INFO_STREAM("Motor 2 is operating in closed loop mode.");
-			}
-			else
-			{
-				ROS_INFO_STREAM("Motor 2 is operating in open loop mode.");
-			}
+			RCLCPP_INFO(LOGGER, "No valid type was found for motor 1. Assigning set_speed");
+			motor_1_type = "set_speed";
 		}
-		else if (channel_mode == "single")
+		if (motor_2_type = "")
 		{
-			ROS_INFO_STREAM("Driver controls two motors seperately.");
-			if (motor_1_type == "set_speed")
-			{
-				ROS_INFO_STREAM("Motor 1 is operating in closed loop mode.");
-				cmd_vel_channel_1_sub = nh_.subscribe("chan_1_set_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);
-			}
-			else
-			{
-				ROS_INFO_STREAM("Motor 1 is operating in open loop mode.");
-				cmd_vel_channel_1_sub = nh_.subscribe("chan_1_go_to_vel", 10, &RoboteqDriver::channel_1_vel_callback, this);
-			}
-			if (motor_2_type == "set_speed")
-			{
-				ROS_INFO_STREAM("Motor 2 is operating in closed loop mode.");
-				cmd_vel_channel_2_sub = nh_.subscribe("chan_2_set_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);
-			}
-			else
-			{
-				ROS_INFO_STREAM("Motor 2 is operating in open loop mode.");
-				cmd_vel_channel_2_sub = nh_.subscribe("chan_2_go_to_vel", 10, &RoboteqDriver::channel_2_vel_callback, this);
-			}
+			RCLCPP_INFO(LOGGER, "No valid type was found for motor 2. Assigning set_speed");
+			motor_2_type = "set_speed";
 		}
-
-		connect();
 	}
 
-	void connect()
+	if (motor_type == "skid_steering")
 	{
-
-		try
+		if (max_vel_x < 0)
 		{
-
-			ser_.setPort(port);
-			ser_.setBaudrate(baud); // get baud as param
-			serial::Timeout to = serial::Timeout::simpleTimeout(10);
-			ser_.setTimeout(to);
-			ser_.open();
+			max_vel_x = 0.5;
 		}
-		catch (serial::IOException &e)
+		
+		if (max_vel_ang < 0)
 		{
-
-			ROS_ERROR_STREAM("Unable to open port ");
-			ROS_INFO_STREAM("Unable to open port");
-			;
+			max_vel_ang = 0.5;
 		}
-		if (ser_.isOpen())
+		if (reduction_ratio < 0)
 		{
+			reduction_ratio = 70;
+		}
 
-			ROS_INFO_STREAM("Serial Port initialized\"");
+		RCLCPP_INFO(LOGGER, "Driver controls two motors moving a skid steering vehicle.");
+		cmd_vel_sub = this->create_subscription<geometry_msgs::msg::Twist>("cmd_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::skid_steering_vel_callback, this, _1));
+	}
+	else if (channel_mode == "dual")
+	{
+		ROS_INFO_STREAM("Driver controls two motors with a single value.");
+		cmd_vel_channel_1_sub = this->create_subscription<std_msgs::msg::Int16>("dual_cmd_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_1_vel_callback, this, _1));
+		cmd_vel_channel_2_sub = this->create_subscription<std_msgs::msg::Int16>("dual_cmd_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_2_vel_callback, this, _1));
+
+		if ((motor_1_type == "set_speed") || (motor_type == "set_speed"))
+		{
+			RCLCPP_INFO(LOGGER, "Motor 1 is operating in closed loop mode.");
 		}
 		else
 		{
-			// ROS_INFO_STREAM("HI4");
-			ROS_INFO_STREAM("Serial Port is not open");
+			RCLCPP_INFO(LOGGER, "Motor 1 is operating in open loop mode.");
 		}
-		run();
+		if ((motor_2_type == "set_speed") || (motor_type == "set_speed"))
+		{
+			RCLCPP_INFO(LOGGER, "Motor 2 is operating in closed loop mode.");
+		}
+		else
+		{
+			RCLCPP_INFO(LOGGER, "Motor 2 is operating in open loop mode.");
+		}
+	}
+	else if (channel_mode == "single")
+	{
+		RCLCPP_INFO(LOGGER, "Driver controls two motors seperately.");
+		if (motor_1_type == "set_speed")
+		{
+			RCLCPP_INFO(LOGGER, "Motor 1 is operating in closed loop mode.");
+			cmd_vel_channel_1_sub = this->create_subscription<std_msgs::msg::Int16>("chan_1_set_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_1_vel_callback, this, _1));
+		}
+		else
+		{
+			RCLCPP_INFO(LOGGER, "Motor 1 is operating in open loop mode.");
+			cmd_vel_channel_1_sub = this->create_subscription<std_msgs::msg::Int16>("chan_1_go_to_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_1_vel_callback, this, _1));
+		}
+		if (motor_2_type == "set_speed")
+		{
+			RCLCPP_INFO(LOGGER, "Motor 2 is operating in closed loop mode.");
+			cmd_vel_channel_2_sub = this->create_subscription<std_msgs::msg::Int16>("chan_2_set_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_2_vel_callback, this, _1));
+		}
+		else
+		{
+			RCLCPP_INFO(LOGGER, "Motor 2 is operating in open loop mode.");
+			cmd_vel_channel_2_sub = this->create_subscription<std_msgs::msg::Int16>("chan_2_go_to_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_2_vel_callback, this, _1));
+		}
 	}
 
-	void rpm_mapping(const double &right_speed, const double &left_speed, double &right_speed_cr, double &left_speed_cr)
+	// Print parameters
+	RCLCPP_INFO_STREAM(LOGGER, "port: " << port);
+	RCLCPP_INFO_STREAM(LOGGER, "baud: " << baud);
+	RCLCPP_INFO_STREAM(LOGGER, "safe_speed: " << safe_speed);
+	RCLCPP_INFO_STREAM(LOGGER, "channel_mode: " << channel_mode);
+	RCLCPP_INFO_STREAM(LOGGER, "motor_type: " << motor_type);
+	RCLCPP_INFO_STREAM(LOGGER, "motor_1_type: " << motor_1_type);
+	RCLCPP_INFO_STREAM(LOGGER, "motor_2_type: " << motor_2_type);
+	RCLCPP_INFO_STREAM(LOGGER, "track_width: " << track_width);
+	RCLCPP_INFO_STREAM(LOGGER, "max_vel_x: " << max_vel_x);
+	RCLCPP_INFO_STREAM(LOGGER, "max_vel_ang: " << max_vel_ang);
+	RCLCPP_INFO_STREAM(LOGGER, "reduction_ratio: " << reduction_ratio);
+	RCLCPP_INFO_STREAM(LOGGER, "wheel_circumference: " << wheel_circumference);
+
+	connect();
+}
+
+RoboteqDriver::~RoboteqDriver()
+{
+	if (ser.isOpen())
 	{
-		double max_vel_wheel= (wheel_circumference*max_rpm)/(reduction_ratio * 60);
+		ser.close();
+	}
+}
+
+void RoboteqDriver::connect()
+{
+	try
+	{
+		ser_.setPort(port);
+		ser_.setBaudrate(baud);
+		serial::Timeout to = serial::Timeout::simpleTimeout(10);
+		ser_.setTimeout(to);
+		ser_.open();
+	}
+	catch (serial::IOException &e)
+	{
+
+		ROS_ERROR_STREAM("Unable to open port ");
+		ROS_INFO_STREAM("Unable to open port");
+		;
+	}
+	if (ser_.isOpen())
+	{
+
+		ROS_INFO_STREAM("Serial Port initialized\"");
+	}
+	else
+	{
+		// ROS_INFO_STREAM("HI4");
+		ROS_INFO_STREAM("Serial Port is not open");
+	}
+	run();
+}
+
+	void RoboteqDriver::rpm_mapping(const double &right_speed, const double &left_speed, double &right_speed_cr, double &left_speed_cr)
+	{
+		double max_vel_wheel = (wheel_circumference*max_rpm)/(reduction_ratio * 60);
 
 		double mx = std::max(fabs(right_speed),fabs(left_speed));
 		double ln = 1.0;
-		if (mx>max_vel_wheel)
+		if (mx > max_vel_wheel)
+		{
 			ln = max_vel_wheel/mx;
+		}	
 
 		right_speed_cr = ln*right_speed;
 		left_speed_cr = ln*left_speed;
+
 		// std::cout<<"================================="<<std::endl;
 		// std::cout<<"max_vel_wheel: "<<max_vel_wheel<<std::endl;
 		// std::cout<<"right_speed: "<<right_speed<<std::endl;
 		// std::cout<<"left_speed: "<<left_speed<<std::endl;
 		// std::cout<<"right_speed_cr: "<<right_speed_cr<<std::endl;
 		// std::cout<<"left_speed_cr: "<<left_speed_cr<<std::endl;
-
 	}
 
-	void skid_steering_vel_callback(const geometry_msgs::Twist &msg)
+	void RoboteqDriver::skid_steering_vel_callback(const geometry_msgs::Twist &msg)
 	{
 
 		// max linear speed and angular
@@ -375,7 +309,7 @@ private:
 		ser_.flush();
 	}
 
-	void dual_vel_callback(const std_msgs::Int16 &msg)
+	void RoboteqDriver::dual_vel_callback(const std_msgs::msg::Int16 &msg)
 	{
 		// wheel speed (m/s)
 		int cmd = msg.data;
@@ -401,7 +335,7 @@ private:
 		ser_.flush();
 	}
 
-	void channel_1_vel_callback(const std_msgs::Int16 &msg)
+	void RoboteqDriver::channel_1_vel_callback(const std_msgs::msg::Int16 &msg)
 	{
 		// wheel speed (m/s)
 		int cmd = msg.data;
@@ -428,7 +362,7 @@ private:
 		ser_.flush();
 	}
 
-	void channel_2_vel_callback(const std_msgs::Int16 &msg)
+	void RoboteqDriver::channel_2_vel_callback(const std_msgs::msg::Int16 &msg)
 	{
 		// wheel speed (m/s)
 		int cmd = msg.data;
@@ -456,7 +390,7 @@ private:
 		ser_.flush();
 	}
 
-	bool configservice(roboteq_motor_controller_driver::config_srv::Request &request, roboteq_motor_controller_driver::config_srv::Response &response)
+	bool RoboteqDriver::configservice(roboteq_motor_controller_driver::config_srv::Request &request, roboteq_motor_controller_driver::config_srv::Response &response)
 	{
 		std::stringstream str;
 		str << "^" << request.userInput << " " << request.channel << " " << request.value << "_ "
@@ -469,7 +403,7 @@ private:
 		return true;
 	}
 
-	bool commandservice(roboteq_motor_controller_driver::command_srv::Request &request, roboteq_motor_controller_driver::command_srv::Response &response)
+	bool RoboteqDriver::commandservice(roboteq_motor_controller_driver::command_srv::Request &request, roboteq_motor_controller_driver::command_srv::Response &response)
 	{
 		std::stringstream str;
 		str << "!" << request.userInput << " " << request.channel << " " << request.value << "_";
@@ -481,7 +415,7 @@ private:
 		return true;
 	}
 
-	bool maintenanceservice(roboteq_motor_controller_driver::maintenance_srv::Request &request, roboteq_motor_controller_driver::maintenance_srv::Response &response)
+	bool RoboteqDriver::maintenanceservice(roboteq_motor_controller_driver::maintenance_srv::Request &request, roboteq_motor_controller_driver::maintenance_srv::Response &response)
 	{
 		std::stringstream str;
 		str << "%" << request.userInput << " "
@@ -494,7 +428,7 @@ private:
 		return true;
 	}
 
-	void initialize_services()
+	void RoboteqDriver::initialize_services()
 	{
 		n = ros::NodeHandle();
 		configsrv = n.advertiseService("config_service", &RoboteqDriver::configservice, this);
@@ -502,7 +436,7 @@ private:
 		maintenancesrv = n.advertiseService("maintenance_service", &RoboteqDriver::maintenanceservice, this);
 	}
 
-	void run()
+	void RoboteqDriver::run()
 	{
 		initialize_services();
 
@@ -541,13 +475,6 @@ private:
 		previous_time = ros::Time::now();
 		timer_pub_ = nh_.createTimer(ros::Duration(double(1.0 / max_freq)), &RoboteqDriver::queryCallback, this);
 	}
-};
-
-RoboteqDriver::RoboteqDriver(ros::NodeHandle nh, ros::NodeHandle nh_priv) : nh_(nh),
-																			nh_priv_(nh_priv)
-{
-	initialize();
-}
 
 void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 {
@@ -654,16 +581,10 @@ void RoboteqDriver::formQuery(std::string param,
 
 int main(int argc, char **argv)
 {
-	ros::init(argc, argv, "roboteq_motor_controller_driver");
-
-	ros::NodeHandle nh;
-	ros::NodeHandle nh_priv("~");
-	RoboteqDriver driver(nh, nh_priv);
-
-	// ros::MultiThreadedSpinner spinner(8);
-	// spinner.spin();
-	ros::spin(); // multithreading doesn't provide any benefit cause of mutex in callback
-	ros::waitForShutdown();
-
-	return 0;
+	rclcpp::init(argc, argv);
+	rclcpp::executors::MultiThreadedExecutor executor;
+	executor.add_node(std::make_shared<RoboteqDriver>());
+	executor.spin();
+	rclcpp::shutdown();
+  	return 0;
 }
