@@ -1,72 +1,101 @@
-#include "ros/ros.h"
+#pragma once
 
-class Odometry_calc{
+#include <mutex>
+#include <rclcpp/rclcpp.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+#include <sensor_msgs/msg/imu.hpp>
+#include <geometry_msgs/msg/quaternion.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include "tf2_ros/transform_broadcaster.h"
+#include "roboteq_motor_controller_msgs/msg/channel_values.hpp"
+
+class OdometryCalc : public rclcpp::Node
+{
 
 public:
-	Odometry_calc();
-
-	void spin();
-
+	OdometryCalc();
 
 private:
-	ros::NodeHandle n;
-	ros::Subscriber sub;
-	ros::Subscriber l_wheel_sub;
-	ros::Subscriber r_wheel_sub;
-	ros::Publisher odom_pub;
+	void init_variables();
+	void init_imu_variables();	
+	void encoderBCR(const roboteq_motor_controller_msgs::msg::ChannelValues &msg);
+	void imu_callback(const sensor_msgs::msg::Imu &msg);	
+	void update();
+	void TfPub();
+	void OdomPub();	
 
-	tf::TransformBroadcaster odom_broadcaster;
-	//Encoder related variables
+	rclcpp::CallbackGroup::SharedPtr encoder_group_;
+	rclcpp::CallbackGroup::SharedPtr imu_group_;
+
+	rclcpp::Subscription<roboteq_motor_controller_msgs::msg::ChannelValues>::SharedPtr wheel_sub;
+	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub;
+	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub;
+
+	std::unique_ptr<tf2_ros::TransformBroadcaster> odom_broadcaster;
+	geometry_msgs::msg::TransformStamped odom_trans;
+	geometry_msgs::msg::Quaternion odom_quat;
+
+	std::mutex yaw_mtx;
+
+	/////////////////////
+	//Exposed variables//
+	/////////////////////
+	int encoder_cpr;
 	double encoder_min;
 	double encoder_max;
+	double wrp_lim;
+	// subscribe to abs_hall_count instead of hall_count topic to receive the total-absolute number of pulses instead of the relative number of counts
+	bool sub_to_abs;
 
-	double encoder_low_wrap;
+	int reduction_ratio;
+	double wheel_circumference;
+	double track_width;	
+	bool enable_imu_yaw;
+	std::string imu_topic;
+	int imu_discarded;
+	bool tf_publish;
+	std::string tf_header_frame;
+	std::string tf_child_frame;		
+	std::string odom_topic;	
+	std::string odom_frame ;
+	
+	//count or pulse values received from the subscriber, depending on where we are subscribing
+	double left_count;
+	double right_count;
+	//previous pulse values, used to calculate the elapsed pulses in case we are subscribing to the absolute topic
+	int prev_l_pulses;
+	int prev_r_pulses;
+	//Absolute count values, used only in case we are subscribing to the absolute topic
+	int left_count_abs;
+	int right_count_abs;
+	//Variables for wrapping
+	double encoder_low_wrap; 
 	double encoder_high_wrap;
+	//boolean for the initialization of absolute pulse values in case of absolute subscription
+	bool abs_init ; 
 
-	double prev_lencoder;
-	double prev_rencoder;
+	//Time variables
+	rclcpp::Time then;
+	rclcpp::Time now;
+	double elapsed;
 
-	double lmult;
-	double rmult;
+	//Distance related variables//
+	//left and right covered distances
+	double d_left, d_right; 
+	//Rover distance covered and angle change
+	double DeltaS, DeltaTh;
+	//Distance covered in X and Y axes
+	double DeltaX, DeltaY;
+	//distance and angle rate of change
+	double dx, dr;
+	//meters covered per each encoder tick
+	double meters_per_tick;
+	//final x,y,th
+	double x_final, y_final, theta_final;
 
-	double left;
-	double right;
-
-	double rate;
-
-	ros::Duration t_delta;
-
-	ros::Time t_next;
-
-	ros::Time then;
-
-
-	double enc_left ;
-
-	double enc_right;
-
-	double ticks_meter;
-
-	double base_width;
-
-	double dx;
-
-	double dr;
-
-	double x_final,y_final, theta_final;
-
-	ros::Time current_time, last_time;
-
-
-	void leftencoderCb(const roboteq_motor_controller_driver::channel_values& left_ticks);
-
-	void rightencoderCb(const roboteq_motor_controller_driver::channel_values& right_ticks);
-	//void rightencoderCb(std_msgs::Int64::ConstPtr& right_ticks);
-	void init_variables();
-
-	void get_node_params();
-
-
-	void update();
+	//imu variables
+	bool imu_initialized;
+	double prev_imu_yaw, imu_yaw, imu_yaw_init;
+	int imu_cnt;	
 };
 
