@@ -8,6 +8,7 @@
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>generate_parameter_library</depend>
   <depend>roboteq_motor_controller_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>sensor_msgs</depend>

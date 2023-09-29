@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>
+#include "diff_odom_parameters.hpp"
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
@@ -9,6 +10,8 @@
 #include "tf2_ros/transform_broadcaster.h"
 #include "roboteq_motor_controller_msgs/msg/channel_values.hpp"
 
+namespace diff_odom
+{
 class OdometryCalc : public rclcpp::Node
 {
 
@@ -24,6 +27,9 @@ private:
 	void TfPub();
 	void OdomPub();	
 
+	std::shared_ptr<diff_odom::ParamListener> param_listener_;
+    diff_odom::Params params_;
+
 	rclcpp::CallbackGroup::SharedPtr encoder_group_;
 	rclcpp::CallbackGroup::SharedPtr imu_group_;
 
@@ -36,28 +42,6 @@ private:
 	geometry_msgs::msg::Quaternion odom_quat;
 
 	std::mutex yaw_mtx;
-
-	/////////////////////
-	//Exposed variables//
-	/////////////////////
-	int encoder_cpr;
-	double encoder_min;
-	double encoder_max;
-	double wrp_lim;
-	// subscribe to abs_hall_count instead of hall_count topic to receive the total-absolute number of pulses instead of the relative number of counts
-	bool sub_to_abs;
-
-	int reduction_ratio;
-	double wheel_circumference;
-	double track_width;	
-	bool enable_imu_yaw;
-	std::string imu_topic;
-	int imu_discarded;
-	bool tf_publish;
-	std::string tf_header_frame;
-	std::string tf_child_frame;		
-	std::string odom_topic;	
-	std::string odom_frame ;
 	
 	//count or pulse values received from the subscriber, depending on where we are subscribing
 	double left_count;
@@ -98,4 +82,6 @@ private:
 	double prev_imu_yaw, imu_yaw, imu_yaw_init;
 	int imu_cnt;	
 };
+
+} // namespace diff_odom
 

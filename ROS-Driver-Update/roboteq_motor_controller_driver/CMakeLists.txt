@@ -14,9 +14,15 @@ find_package(geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(generate_parameter_library REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
+
+generate_parameter_library(
+  diff_odom_parameters # cmake target name for the parameter library
+  src/diff_odom_parameters.yaml # path to input yaml file
+)
 
 # add_executable(roboteq_motor_controller_driver_node
 #   src/roboteq_motor_controller_driver_node.cpp
@@ -34,12 +40,14 @@ find_package(tf2_geometry_msgs REQUIRED)
 add_executable(diff_odom
   src/diff_odom.cpp
 )
-
 target_include_directories(diff_odom PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(diff_odom PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-
+target_link_libraries(diff_odom
+  rclcpp::rclcpp
+  diff_odom_parameters
+)
 ament_target_dependencies(diff_odom
   rclcpp
   nav_msgs
