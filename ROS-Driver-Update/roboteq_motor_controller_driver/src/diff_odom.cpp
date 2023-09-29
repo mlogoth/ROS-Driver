@@ -17,23 +17,23 @@ OdometryCalc::OdometryCalc() : Node("diff_odom")
     params_ = param_listener_->get_params();
 
 	// Print parameters
-	RCLCPP_INFO_STREAM(LOGGER, "encoder_cpr: " << params_.encoder_cpr);
-	RCLCPP_INFO_STREAM(LOGGER, "encoder_min: " << params_.encoder_min);
-	RCLCPP_INFO_STREAM(LOGGER, "encoder_max: " << params_.encoder_max);
-	RCLCPP_INFO_STREAM(LOGGER, "wrp_lim: " << params_.wrp_lim);
-	RCLCPP_INFO_STREAM(LOGGER, "sub_to_abs: " << params_.sub_to_abs);		
+	RCLCPP_INFO_STREAM(LOGGER, "encoder_cpr: " << params_.encoder.encoder_cpr);
+	RCLCPP_INFO_STREAM(LOGGER, "encoder_min: " << params_.encoder.encoder_min);
+	RCLCPP_INFO_STREAM(LOGGER, "encoder_max: " << params_.encoder.encoder_max);
+	RCLCPP_INFO_STREAM(LOGGER, "wrp_lim: " << params_.encoder.wrp_lim);
+	RCLCPP_INFO_STREAM(LOGGER, "sub_to_abs: " << params_.encoder.sub_to_abs);		
 
-	RCLCPP_INFO_STREAM(LOGGER, "reduction_ratio: " << params_.reduction_ratio);
-	RCLCPP_INFO_STREAM(LOGGER, "wheel_circumference: " << params_.wheel_circumference);
-	RCLCPP_INFO_STREAM(LOGGER, "track_width: " << params_.track_width);
-	RCLCPP_INFO_STREAM(LOGGER, "enable_imu_yaw: " << params_.enable_imu_yaw);
-	RCLCPP_INFO_STREAM(LOGGER, "imu_topic: " << params_.imu_topic);
-	RCLCPP_INFO_STREAM(LOGGER, "imu_discarded: " << params_.imu_discarded);
-	RCLCPP_INFO_STREAM(LOGGER, "tf_publish: " << params_.tf_publish);
-	RCLCPP_INFO_STREAM(LOGGER, "tf_header_frame: " << params_.tf_header_frame);
-	RCLCPP_INFO_STREAM(LOGGER, "tf_child_frame: " << params_.tf_child_frame);
-	RCLCPP_INFO_STREAM(LOGGER, "odom_topic: " << params_.odom_topic);
-	RCLCPP_INFO_STREAM(LOGGER, "odom_frame: " << params_.odom_frame);	
+	RCLCPP_INFO_STREAM(LOGGER, "reduction_ratio: " << params_.mechanical.reduction_ratio);
+	RCLCPP_INFO_STREAM(LOGGER, "wheel_circumference: " << params_.mechanical.wheel_circumference);
+	RCLCPP_INFO_STREAM(LOGGER, "track_width: " << params_.mechanical.track_width);
+	RCLCPP_INFO_STREAM(LOGGER, "enable_imu_yaw: " << params_.imu.enable_imu_yaw);
+	RCLCPP_INFO_STREAM(LOGGER, "imu_topic: " << params_.imu.imu_topic);
+	RCLCPP_INFO_STREAM(LOGGER, "imu_discarded: " << params_.imu.imu_discarded);
+	RCLCPP_INFO_STREAM(LOGGER, "tf_publish: " << params_.tf.tf_publish);
+	RCLCPP_INFO_STREAM(LOGGER, "tf_header_frame: " << params_.tf.tf_header_frame);
+	RCLCPP_INFO_STREAM(LOGGER, "tf_child_frame: " << params_.tf.tf_child_frame);
+	RCLCPP_INFO_STREAM(LOGGER, "odom_topic: " << params_.odom.odom_topic);
+	RCLCPP_INFO_STREAM(LOGGER, "odom_frame: " << params_.odom.odom_frame);	
 
 	init_variables();
 
@@ -41,23 +41,23 @@ OdometryCalc::OdometryCalc() : Node("diff_odom")
 	encoder_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 	options.callback_group = encoder_group_;
 
-	const std::string encoder_topic = params_.sub_to_abs ? "abs_hall_count" : "hall_count";
+	const std::string encoder_topic = params_.encoder.sub_to_abs ? "abs_hall_count" : "hall_count";
 	wheel_sub = this->create_subscription<roboteq_motor_controller_msgs::msg::ChannelValues>(encoder_topic, rclcpp::SystemDefaultsQoS(), std::bind(&OdometryCalc::encoderBCR, this, _1), options);
 		
-	if (params_.enable_imu_yaw)
+	if (params_.imu.enable_imu_yaw)
 	{
 		init_imu_variables();
 		imu_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 		options.callback_group = imu_group_;
-		imu_sub = this->create_subscription<sensor_msgs::msg::Imu>(params_.imu_topic, rclcpp::SystemDefaultsQoS(), std::bind(&OdometryCalc::imu_callback, this, _1), options);
+		imu_sub = this->create_subscription<sensor_msgs::msg::Imu>(params_.imu.imu_topic, rclcpp::SystemDefaultsQoS(), std::bind(&OdometryCalc::imu_callback, this, _1), options);
 	}
 
-	if (params_.tf_publish)
+	if (params_.tf.tf_publish)
 	{
 		odom_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 	}
 	
-	odom_pub = this->create_publisher<nav_msgs::msg::Odometry>(params_.odom_topic, rclcpp::SystemDefaultsQoS());
+	odom_pub = this->create_publisher<nav_msgs::msg::Odometry>(params_.odom.odom_topic, rclcpp::SystemDefaultsQoS());
 
 	RCLCPP_INFO(LOGGER, "Started odometry computing node");
 }
@@ -66,8 +66,8 @@ void OdometryCalc::init_variables()
 {
 	abs_init = false;	
 
-	encoder_low_wrap = ((params_.encoder_max - params_.encoder_min) * params_.wrp_lim) + params_.encoder_min;
-	encoder_high_wrap = ((params_.encoder_max - params_.encoder_min) * (1.0 - params_.wrp_lim)) + params_.encoder_min;
+	encoder_low_wrap = ((params_.encoder.encoder_max - params_.encoder.encoder_min) * params_.encoder.wrp_lim) + params_.encoder.encoder_min;
+	encoder_high_wrap = ((params_.encoder.encoder_max - params_.encoder.encoder_min) * (1.0 - params_.encoder.wrp_lim)) + params_.encoder.encoder_min;
 	then = this->get_clock()->now();
 
 	x_final = 0.0;
@@ -77,16 +77,16 @@ void OdometryCalc::init_variables()
 	//if we are subscribing to the absolute topic, we are receiving pulses instead of counts, which are 4 times more.
 	//E.g: 24 pulses per motor revolution correspond to 6 counts p.m.r.
 	//Mind to set the counts per revolution in the query.yaml file, not the pulses.
-	meters_per_tick = params_.wheel_circumference/(params_.encoder_cpr*params_.reduction_ratio); 
-	if (params_.sub_to_abs)
+	meters_per_tick = params_.mechanical.wheel_circumference/(params_.encoder.encoder_cpr*params_.mechanical.reduction_ratio); 
+	if (params_.encoder.sub_to_abs)
 	{
 		meters_per_tick = meters_per_tick / 4;
 	}
 
-	if (params_.tf_publish)
+	if (params_.tf.tf_publish)
 	{
-		odom_trans.header.frame_id = params_.tf_header_frame; //originally was set to odom
-		odom_trans.child_frame_id = params_.tf_child_frame;
+		odom_trans.header.frame_id = params_.tf.tf_header_frame; //originally was set to odom
+		odom_trans.child_frame_id = params_.tf.tf_child_frame;
 		odom_trans.transform.translation.z = 0.0;
 	}	
 }
@@ -106,7 +106,7 @@ void OdometryCalc::encoderBCR(const roboteq_motor_controller_msgs::msg::ChannelV
 	left_count = msg.value[1];
 	update();
 	OdomPub();
-	if (params_.tf_publish)
+	if (params_.tf.tf_publish)
 	{
 		TfPub();
 	}
@@ -135,7 +135,7 @@ void OdometryCalc::imu_callback(const sensor_msgs::msg::Imu &msg)
 		{
 			imu_yaw_init = imu_yaw_init + yaw;
 			imu_cnt++;
-			if (imu_cnt >= params_.imu_discarded)
+			if (imu_cnt >= params_.imu.imu_discarded)
 			{
 				imu_initialized = true;
 				imu_yaw_init /= static_cast<double>(imu_cnt);
@@ -158,7 +158,7 @@ void OdometryCalc::update()
 	////////////////////////////////////////////////////////////////////////////////////
 	//In case we read absolute values, we need to calculate the actual elapsed pulses //
 	////////////////////////////////////////////////////////////////////////////////////
-	if (params_.sub_to_abs)
+	if (params_.encoder.sub_to_abs)
 	{
 		if (!abs_init)
 		{
@@ -175,11 +175,11 @@ void OdometryCalc::update()
 		//left encoder
 		if ((left_count_abs < encoder_low_wrap) && (prev_l_pulses > encoder_high_wrap))
 		{
-			left_count = (params_.encoder_max - prev_l_pulses) + (left_count_abs - params_.encoder_min);
+			left_count = (params_.encoder.encoder_max - prev_l_pulses) + (left_count_abs - params_.encoder.encoder_min);
 		}
 		else if ((left_count_abs > encoder_high_wrap) && (prev_l_pulses < encoder_low_wrap))
 		{
-			left_count = (params_.encoder_max - left_count_abs) + (prev_l_pulses - params_.encoder_min);
+			left_count = (params_.encoder.encoder_max - left_count_abs) + (prev_l_pulses - params_.encoder.encoder_min);
 		}
 		else
 		{
@@ -189,11 +189,11 @@ void OdometryCalc::update()
 		//right encoder
 		if ((right_count_abs < encoder_low_wrap) && (prev_r_pulses > encoder_high_wrap))
 		{
-			right_count = (params_.encoder_max - prev_r_pulses) + (right_count_abs - params_.encoder_min);
+			right_count = (params_.encoder.encoder_max - prev_r_pulses) + (right_count_abs - params_.encoder.encoder_min);
 		}
 		else if ((right_count_abs > encoder_high_wrap) && (prev_r_pulses < encoder_low_wrap))
 		{
-			right_count = (params_.encoder_max - right_count_abs) + (prev_r_pulses - params_.encoder_min);
+			right_count = (params_.encoder.encoder_max - right_count_abs) + (prev_r_pulses - params_.encoder.encoder_min);
 		}
 		else
 		{
@@ -226,9 +226,9 @@ void OdometryCalc::update()
 	dx = DeltaS / elapsed;
 
 	//angular
-	if ((!params_.enable_imu_yaw) || (params_.enable_imu_yaw && !imu_initialized))
+	if ((!params_.imu.enable_imu_yaw) || (params_.imu.enable_imu_yaw && !imu_initialized))
 	{
-		DeltaTh = (d_right - d_left) / params_.track_width;
+		DeltaTh = (d_right - d_left) / params_.mechanical.track_width;
 	}
 	else
 	{
@@ -283,12 +283,12 @@ void OdometryCalc::OdomPub()
 	odom_quat = tf2::toMsg(q);
 	nav_msgs::msg::Odometry odom;
 	odom.header.stamp = now;
-	odom.header.frame_id = params_.odom_frame;
+	odom.header.frame_id = params_.odom.odom_frame;
 	odom.pose.pose.position.x = x_final;
 	odom.pose.pose.position.y = y_final;
 	odom.pose.pose.position.z = 0.0;
 	odom.pose.pose.orientation = odom_quat;
-	odom.child_frame_id = params_.tf_child_frame;
+	odom.child_frame_id = params_.tf.tf_child_frame;
 	odom.twist.twist.linear.x = dx;
 	odom.twist.twist.linear.y = 0;
 	odom.twist.twist.angular.z = dr;
