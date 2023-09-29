@@ -313,7 +313,8 @@ int main(int argc, char **argv)
 {
 	rclcpp::init(argc, argv);
 	rclcpp::executors::MultiThreadedExecutor executor;
-	executor.add_node(std::make_shared<diff_odom::OdometryCalc>());
+	diff_odom::OdometryCalc odom_node{};
+	executor.add_node(odom_node.get_node_base_interface());
 	executor.spin();
 	rclcpp::shutdown();
   	return 0;
