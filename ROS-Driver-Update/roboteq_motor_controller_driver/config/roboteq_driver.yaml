@@ -1,0 +1,55 @@
+/**:
+  ros__parameters:
+    serial:
+      port: /dev/tty/S0
+      baud: 115200
+
+    mechanical:
+      reduction_ratio: 16
+      wheel_circumference: 0.4398229715 # diameter is 140mm
+      track_width: 0.9 #ask
+    
+    motor:
+      channel_mode: dual_differential
+      motor_1_type: set_speed
+      motor_2_type: set_speed
+      max_rpm: 3000
+
+    encoder:
+      encoder_cpr: 2500
+      # encoder_min: -65536
+      # encoder_max: 65536
+      # wrp_lim: 0.3
+      sub_to_abs: false
+
+    differential:
+      safe_speed: false
+      max_vel_x: 0.5
+      max_vel_ang: 0.5
+
+    imu:
+      enable_imu_yaw: false
+      imu_topic: imu/data
+      imu_discarded: 100
+
+    tf:
+      tf_publish: true
+      tf_header_frame: map
+      tf_child_frame: base_footprint
+    
+    odom:
+      odom_topic: odom
+      odom_frame: odom
+
+    queries_list: [query0, query1]
+
+    queries:
+      query0:
+        frequency: 30
+        arguments: [hall_count, abs_hall_count, feedback]
+        commands: ["?BCR", "?CB", "?F"]
+      
+      query1:
+        frequency: 10
+        arguments: [motor_amps, motor_command, hall_speed, fault_flag, volts, dout_status, status_flag, runtime_status_flag, internal_command, battery_amps]
+        commands: ["?A", "?M", "?BS", "?FF", "?V", "?DO", "?FS", "?FM", "?CIS", "?BA"]

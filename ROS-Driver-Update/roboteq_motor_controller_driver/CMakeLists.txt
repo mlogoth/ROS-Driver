@@ -74,13 +74,13 @@ ament_target_dependencies(diff_odom
   roboteq_motor_controller_msgs
 )
 
-# install(DIRECTORY launch 
-#   DESTINATION share/${PROJECT_NAME}
-# )
+install(DIRECTORY launch 
+  DESTINATION share/${PROJECT_NAME}
+)
 
-# install(DIRECTORY config 
-#   DESTINATION share/${PROJECT_NAME}
-# )
+install(DIRECTORY config 
+  DESTINATION share/${PROJECT_NAME}
+)
 
 install(TARGETS roboteq_motor_controller_driver
   DESTINATION lib/${PROJECT_NAME})

@@ -9,6 +9,7 @@
 #include "roboteq_motor_controller_msgs/srv/config.hpp"
 #include "roboteq_motor_controller_msgs/srv/command.hpp"
 #include "roboteq_motor_controller_msgs/srv/maintenance.hpp"
+#include "roboteq_motor_controller_msgs/msg/channel_values.hpp"
 
 template <typename T> float sgn(T val) {
     return (T(0) < val) - (val < T(0));
@@ -26,6 +27,12 @@ public:
 private:
 	void connect();
 	void initialize_services();
+	void rpm_mapping(const double &right_speed, const double &left_speed, double &right_speed_cr, double &left_speed_cr);
+	void skid_steering_vel_callback(const geometry_msgs::msg::Twist &msg);
+	void channel_1_vel_callback(const std_msgs::msg::Int16 &msg);
+	void channel_2_vel_callback(const std_msgs::msg::Int16 &msg);
+	void queryCallback();
+	void formQuery(const std::string query_name, std::stringstream &ser_str);
 	void run();
 	bool configservice(const std::shared_ptr<roboteq_motor_controller_msgs::srv::Config::Request> request, std::shared_ptr<roboteq_motor_controller_msgs::srv::Config::Response> response);
 	bool commandservice(const std::shared_ptr<roboteq_motor_controller_msgs::srv::Command::Request> request, std::shared_ptr<roboteq_motor_controller_msgs::srv::Command::Response> response);
@@ -43,54 +50,11 @@ private:
 	rclcpp::Service<roboteq_motor_controller_msgs::srv::Maintenance>::SharedPtr maintenance_srv;
 
 	rclcpp::Publisher<std_msgs::msg::String>::SharedPtr serial_read_pub_;
+	std::vector<rclcpp::Publisher<roboteq_motor_controller_msgs::msg::ChannelValues>::SharedPtr> query_pubs_;
 	
 	serial::Serial ser_;
 
-
-	rclcpp::Time previous_time;
-	
-	
-	
-	// int max_rpm = 3500;
-	// double reduction_ratio;
-	// ros::Publisher read_publisher;
-	
-
-	
-	// int rate;
-	// ros::Time previous_time;
-
-	// ros::NodeHandle nh;
-
-	// // added in changes
-	// ros::NodeHandle nh_priv_;
-	// std::vector<int> f_list; // a list of frequencies for the queries to be published
-	// std::vector<ros::Publisher> query_pub_;
-	// ros::NodeHandle nh_;
-	// ros::Timer timer_pub_;
-	
-	// std::mutex locker;
-	// ros::Publisher serial_read_pub_;
-
-	// std::vector<int> cum_query_size;
-
-	// void queryCallback(const ros::TimerEvent &);
-
-	// void formQuery(std::string,
-	// 			   std::map<std::string, std::string> &,
-	// 			   std::vector<ros::Publisher> &,
-	// 			   std::stringstream &);
-
-	
-	
-	// void rpm_mapping(const double &right_speed, const double &left_speed, double &right_speed_cr, double &left_speed_cr);
-	// void skid_steering_vel_callback(const geometry_msgs::Twist &msg);
-	// void dual_vel_callback(const std_msgs::Int16 &msg);
-	// void channel_1_vel_callback(const std_msgs::Int16 &msg);
-	// void channel_2_vel_callback(const std_msgs::Int16 &msg);
-	
-	
-	
+	std::vector<int> cum_query_size{0};	
 };
 
 } // roboteq namespace

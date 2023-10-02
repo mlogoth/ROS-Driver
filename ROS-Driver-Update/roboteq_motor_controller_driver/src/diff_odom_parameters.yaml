@@ -5,12 +5,12 @@ diff_odom:
       default_value: 24,
     }
     encoder_min: {
-      type: double,
-      default_value: -2147483648.0,
+      type: int,
+      default_value: -2147483648,
     }
     encoder_max: {
-      type: double,
-      default_value: 2147483648.0,
+      type: int,
+      default_value: 2147483648,
     }
     wrp_lim: {
       type: double,
