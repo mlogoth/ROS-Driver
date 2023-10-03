@@ -89,9 +89,4 @@ roboteq:
       }
       commands: {
         type: string_array,
-      }
-      
-    
-
-  
-  
+      }    

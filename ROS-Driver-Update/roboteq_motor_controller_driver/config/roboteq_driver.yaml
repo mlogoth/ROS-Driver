@@ -7,7 +7,7 @@
     mechanical:
       reduction_ratio: 16
       wheel_circumference: 0.4398229715 # diameter is 140mm
-      track_width: 0.9 #ask
+      track_width: 0.561 #ask
     
     motor:
       channel_mode: dual_differential
@@ -29,8 +29,8 @@
 
     imu:
       enable_imu_yaw: false
-      imu_topic: imu/data
-      imu_discarded: 100
+      # imu_topic: imu/data
+      # imu_discarded: 100
 
     tf:
       tf_publish: true

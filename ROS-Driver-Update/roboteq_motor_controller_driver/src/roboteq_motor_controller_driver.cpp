@@ -369,7 +369,7 @@ void RoboteqDriver::run()
 
 	ser_.write(ss_gen.str()); // Send commands and queries
 	ser_.flush();
-	RCLCPP_INFO_STREAM(LOGGER, ss_gen.str());
+	RCLCPP_INFO_STREAM(LOGGER, "Queries string: " << ss_gen.str());
 	serial_read_pub_ = this->create_publisher<std_msgs::msg::String>("read_serial", rclcpp::SystemDefaultsQoS());
 
 	RCLCPP_INFO_STREAM(LOGGER, "Max frequency " << max_frequency);
@@ -382,7 +382,7 @@ void RoboteqDriver::run()
 int main(int argc, char **argv)
 {
 	rclcpp::init(argc, argv);
-	rclcpp::executors::MultiThreadedExecutor executor;
+	rclcpp::executors::SingleThreadedExecutor executor;
 	roboteq::RoboteqDriver driver_node{};
 	executor.add_node(driver_node.get_node_base_interface());
 	executor.spin();

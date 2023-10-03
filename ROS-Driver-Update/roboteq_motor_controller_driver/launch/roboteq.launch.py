@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, OpaqueFunction, TimerAction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
@@ -32,7 +32,10 @@ def launch_setup(context, *args, **kwargs):
     
     nodes_to_start = [
         driver_node,
-        # odom_node
+        TimerAction(
+            period=0.5,
+            actions=[odom_node]
+        )
     ]
 
     return nodes_to_start
