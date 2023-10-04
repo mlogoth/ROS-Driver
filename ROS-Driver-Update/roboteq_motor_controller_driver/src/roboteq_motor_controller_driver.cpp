@@ -374,7 +374,9 @@ void RoboteqDriver::run()
 
 	RCLCPP_INFO_STREAM(LOGGER, "Max frequency " << max_frequency);
 
-	this->create_wall_timer(std::chrono::duration<double>{1.0/max_frequency}, std::bind(&RoboteqDriver::queryCallback, this));
+	queries_timer_ = this->create_wall_timer(std::chrono::duration<double>{1.0/max_frequency}, std::bind(&RoboteqDriver::queryCallback, this));
+
+	RCLCPP_INFO(LOGGER, "Ready");
 }
 
 } // roboteq namespace

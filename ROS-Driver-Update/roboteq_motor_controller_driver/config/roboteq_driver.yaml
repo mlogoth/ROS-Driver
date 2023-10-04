@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     serial:
-      port: /dev/tty/S0
+      port: /dev/ttyACM1
       baud: 115200
 
     mechanical:

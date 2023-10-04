@@ -51,6 +51,8 @@ private:
 
 	rclcpp::Publisher<std_msgs::msg::String>::SharedPtr serial_read_pub_;
 	std::vector<rclcpp::Publisher<roboteq_motor_controller_msgs::msg::ChannelValues>::SharedPtr> query_pubs_;
+
+	rclcpp::TimerBase::SharedPtr queries_timer_;
 	
 	serial::Serial ser_;
 
