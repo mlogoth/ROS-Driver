@@ -1,11 +1,11 @@
 /**:
   ros__parameters:
     serial:
-      port: /dev/ttyACM1
+      port: /dev/ttyACM0
       baud: 115200
 
     mechanical:
-      reduction_ratio: 16
+      reduction_ratio: 15.51
       wheel_circumference: 0.4398229715 # diameter is 140mm
       track_width: 0.561 #ask
     
@@ -16,7 +16,7 @@
       max_rpm: 3000
 
     encoder:
-      encoder_cpr: 2500
+      encoder_cpr: 10000 #with quadrature
       # encoder_min: -65536
       # encoder_max: 65536
       # wrp_lim: 0.3
@@ -24,8 +24,8 @@
 
     differential:
       safe_speed: false
-      max_vel_x: 0.5
-      max_vel_ang: 0.5
+      max_vel_x: 1.5
+      max_vel_ang: 1.5
 
     imu:
       enable_imu_yaw: false
@@ -46,10 +46,10 @@
     queries:
       query0:
         frequency: 30
-        arguments: [hall_count, abs_hall_count, feedback]
-        commands: ["?BCR", "?CB", "?F"]
+        arguments: [encoder_count, abs_encoder_count, feedback]
+        commands: ["?CR", "?C", "?F"]
       
       query1:
         frequency: 10
-        arguments: [motor_amps, motor_command, hall_speed, fault_flag, volts, dout_status, status_flag, runtime_status_flag, internal_command, battery_amps]
-        commands: ["?A", "?M", "?BS", "?FF", "?V", "?DO", "?FS", "?FM", "?CIS", "?BA"]
+        arguments: [motor_amps, motor_command, encoder_speed, fault_flag, volts, dout_status, status_flag, runtime_status_flag, internal_command, battery_amps]
+        commands: ["?A", "?M", "?S", "?FF", "?V", "?DO", "?FS", "?FM", "?CIS", "?BA"]

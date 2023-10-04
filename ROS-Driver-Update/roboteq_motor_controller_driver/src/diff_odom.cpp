@@ -41,7 +41,7 @@ OdometryCalc::OdometryCalc() : Node("diff_odom")
 	encoder_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 	options.callback_group = encoder_group_;
 
-	const std::string encoder_topic = params_.encoder.sub_to_abs ? "abs_hall_count" : "hall_count";
+	const std::string encoder_topic = params_.encoder.sub_to_abs ? "abs_encoder_count" : "encoder_count";
 	wheel_sub = this->create_subscription<roboteq_motor_controller_msgs::msg::ChannelValues>(encoder_topic, rclcpp::SystemDefaultsQoS(), std::bind(&OdometryCalc::encoderBCR, this, _1), options);
 		
 	if (params_.imu.enable_imu_yaw)
@@ -102,8 +102,8 @@ void OdometryCalc::init_imu_variables()
 //Encoder callback
 void OdometryCalc::encoderBCR(const roboteq_motor_controller_msgs::msg::ChannelValues &msg)
 {
-	right_count = msg.value[0];
-	left_count = msg.value[1];
+	left_count = msg.value[0];
+	right_count = msg.value[1];	
 	update();
 	OdomPub();
 	if (params_.tf.tf_publish)
@@ -262,15 +262,6 @@ void OdometryCalc::update()
 	//update previous time//
 	////////////////////////
 	then = now;
-
-	////////////////
-	//debug prints//
-	////////////////
-	// RCLCPP_INFO_STREAM("x final: " << x_final);
-	// RCLCPP_INFO_STREAM("y final: " << y_final);
-	// RCLCPP_INFO_STREAM("theta_final: " << theta_final*180.0/3.14);
-	// RCLCPP_INFO_STREAM("left_abs_hall_count: " << left_count_abs);
-	// RCLCPP_INFO_STREAM("right_abs_hall_count: " << right_count_abs);
 }
 
 void OdometryCalc::OdomPub()

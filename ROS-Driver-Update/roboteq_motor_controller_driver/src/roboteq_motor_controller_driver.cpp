@@ -203,8 +203,8 @@ void RoboteqDriver::skid_steering_vel_callback(const geometry_msgs::msg::Twist &
 	}
 
 	// wheel speed (m/s)
-	double right_speed = vx - params_.mechanical.track_width * vw / 2.0;
-	double left_speed = vx + params_.mechanical.track_width * vw / 2.0;
+	double right_speed = vx + params_.mechanical.track_width * vw / 2.0;
+	double left_speed = vx - params_.mechanical.track_width * vw / 2.0;
 
 	double right_speed_cr;
 	double left_speed_cr;
@@ -216,8 +216,8 @@ void RoboteqDriver::skid_steering_vel_callback(const geometry_msgs::msg::Twist &
 	std::stringstream right_cmd;
 	std::stringstream left_cmd;
 
-	right_cmd << "!S 1 " << (int)(right_rpm) << "\r";
-	left_cmd << "!S 2 " << (int)(left_rpm) << "\r";
+	left_cmd << "!S 1 " << (int)(left_rpm) << "\r";
+	right_cmd << "!S 2 " << (int)(right_rpm) << "\r";
 
 	ser_.write(right_cmd.str());
 	ser_.write(left_cmd.str());

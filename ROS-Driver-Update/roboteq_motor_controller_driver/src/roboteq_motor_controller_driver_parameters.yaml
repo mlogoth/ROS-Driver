@@ -9,8 +9,8 @@ roboteq:
 
   mechanical:
     reduction_ratio: {
-      type: int,
-      default_value: 70,
+      type: double,
+      default_value: 70.0,
     }
     wheel_circumference: {
       type: double,
