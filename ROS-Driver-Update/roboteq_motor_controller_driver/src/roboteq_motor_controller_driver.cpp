@@ -370,7 +370,7 @@ void RoboteqDriver::queryCallback()
 					}
 					else
 					{
-						for (const auto& [key, value] : relative_arguments[frequency_index]) 
+						for (auto& [key, msg] : relative_arguments[frequency_index]) 
 						{
 							sub_query_fields.clear();
 							boost::split(sub_query_fields, query_fields[key+1], boost::algorithm::is_any_of(":"));
@@ -379,7 +379,7 @@ void RoboteqDriver::queryCallback()
 							{
 								try
 								{
-									relative_arguments[frequency_index][key+1].value[k] += boost::lexical_cast<int>(sub_query_fields[k]);
+									msg.value[k] += boost::lexical_cast<int>(sub_query_fields[k]);
 								}
 								catch (const std::exception &e)
 								{
