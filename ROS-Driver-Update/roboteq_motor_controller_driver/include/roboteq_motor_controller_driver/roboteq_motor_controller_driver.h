@@ -32,7 +32,7 @@ private:
 	void channel_1_vel_callback(const std_msgs::msg::Int16 &msg);
 	void channel_2_vel_callback(const std_msgs::msg::Int16 &msg);
 	void queryCallback();
-	void formQuery(const std::string query_name, std::stringstream &ser_str);
+	void formQuery(const int index, std::stringstream &ser_str);
 	void run();
 	bool configservice(const std::shared_ptr<roboteq_motor_controller_msgs::srv::Config::Request> request, std::shared_ptr<roboteq_motor_controller_msgs::srv::Config::Response> response);
 	bool commandservice(const std::shared_ptr<roboteq_motor_controller_msgs::srv::Command::Request> request, std::shared_ptr<roboteq_motor_controller_msgs::srv::Command::Response> response);
@@ -56,7 +56,9 @@ private:
 	
 	serial::Serial ser_;
 
-	std::vector<int> cum_query_size{0};	
+	std::vector<int> cum_query_size{0};
+
+	std::map<int, std::map<int, roboteq_motor_controller_msgs::msg::ChannelValues>> relative_arguments;	
 };
 
 } // roboteq namespace

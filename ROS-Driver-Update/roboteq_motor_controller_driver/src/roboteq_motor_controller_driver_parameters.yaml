@@ -73,9 +73,11 @@ roboteq:
     type: string_array,
     validation: {
       size_lt<>: [4],
+      unique<>: [],
     }
   }
 
+  # Arguments in queries should be unique, there is no check for duplicates between queries
   queries:
     __map_queries_list:
       frequency: {
@@ -86,7 +88,26 @@ roboteq:
       }        
       arguments: {
         type: string_array,
+        validation: {
+          unique<>: [],
+        }
       }
       commands: {
         type: string_array,
-      }    
+        validation: {
+          unique<>: [],
+        }
+      }
+    relative_arguments: {
+      type: string_array,
+      default_value: ["?CR", "?BCR"],
+      description: "Arguments, such as relative encoder counts, whose values should not be lost/skipped.",
+      validation: {
+        unique<>: [],
+      }
+    }
+    ns: {
+      type: string,
+      default_value: "roboteq",
+      description: "Namespace for publishers"
+    }   
