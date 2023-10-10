@@ -26,9 +26,7 @@ OdometryCalc::OdometryCalc() : Node("diff_odom")
 	RCLCPP_INFO_STREAM(LOGGER, "reduction_ratio: " << params_.mechanical.reduction_ratio);
 	RCLCPP_INFO_STREAM(LOGGER, "wheel_circumference: " << params_.mechanical.wheel_circumference);
 	RCLCPP_INFO_STREAM(LOGGER, "track_width: " << params_.mechanical.track_width);
-	RCLCPP_INFO_STREAM(LOGGER, "enable_imu_yaw: " << params_.imu.enable_imu_yaw);
-	RCLCPP_INFO_STREAM(LOGGER, "imu_topic: " << params_.imu.imu_topic);
-	RCLCPP_INFO_STREAM(LOGGER, "imu_discarded: " << params_.imu.imu_discarded);
+	
 	RCLCPP_INFO_STREAM(LOGGER, "tf_publish: " << params_.tf.tf_publish);
 	RCLCPP_INFO_STREAM(LOGGER, "tf_header_frame: " << params_.tf.tf_header_frame);
 	RCLCPP_INFO_STREAM(LOGGER, "tf_child_frame: " << params_.tf.tf_child_frame);
@@ -41,16 +39,7 @@ OdometryCalc::OdometryCalc() : Node("diff_odom")
 	encoder_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 	options.callback_group = encoder_group_;
 
-	const std::string encoder_topic = params_.encoder.sub_to_abs ? "abs_encoder_count" : "encoder_count";
-	wheel_sub = this->create_subscription<roboteq_motor_controller_msgs::msg::ChannelValues>(encoder_topic, rclcpp::SystemDefaultsQoS(), std::bind(&OdometryCalc::encoderBCR, this, _1), options);
-		
-	if (params_.imu.enable_imu_yaw)
-	{
-		init_imu_variables();
-		imu_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-		options.callback_group = imu_group_;
-		imu_sub = this->create_subscription<sensor_msgs::msg::Imu>(params_.imu.imu_topic, rclcpp::SystemDefaultsQoS(), std::bind(&OdometryCalc::imu_callback, this, _1), options);
-	}
+	wheel_sub = this->create_subscription<example_interfaces::msg::Int64MultiArray>(params_.ns + "/count_and_speed", rclcpp::SystemDefaultsQoS(), std::bind(&OdometryCalc::roboteq_callback, this, _1), options);
 
 	if (params_.tf.tf_publish)
 	{
@@ -68,7 +57,6 @@ void OdometryCalc::init_variables()
 
 	encoder_low_wrap = ((params_.encoder.encoder_max - params_.encoder.encoder_min) * params_.encoder.wrp_lim) + params_.encoder.encoder_min;
 	encoder_high_wrap = ((params_.encoder.encoder_max - params_.encoder.encoder_min) * (1.0 - params_.encoder.wrp_lim)) + params_.encoder.encoder_min;
-	then = this->get_clock()->now();
 
 	x_final = 0.0;
 	y_final = 0.0;
@@ -91,19 +79,13 @@ void OdometryCalc::init_variables()
 	}	
 }
 
-void OdometryCalc::init_imu_variables()
-{
-	imu_initialized = false;
-	imu_yaw_init = 0.0;
-	imu_yaw = 0.0;
-
-}
-
 //Encoder callback
-void OdometryCalc::encoderBCR(const roboteq_motor_controller_msgs::msg::ChannelValues &msg)
+void OdometryCalc::roboteq_callback(const example_interfaces::msg::Int64MultiArray &msg)
 {
-	left_count = msg.value[0];
-	right_count = msg.value[1];	
+	left_count = msg.data[0];
+	right_count = msg.data[1];
+	left_rpm = msg.data[2];
+	right_rpm = msg.data[3];	
 	update();
 	OdomPub();
 	if (params_.tf.tf_publish)
@@ -112,49 +94,18 @@ void OdometryCalc::encoderBCR(const roboteq_motor_controller_msgs::msg::ChannelV
 	}
 }
 
-//Imu callback
-void OdometryCalc::imu_callback(const sensor_msgs::msg::Imu &msg)
-{
-	//TF quaternion
-	tf2::Quaternion q{msg.orientation.x,
-					  msg.orientation.y,
-					  msg.orientation.z,
-					  msg.orientation.w};
-
-	// TF matrix
-	tf2::Matrix3x3 m{q};
-
-	// Calculate ROLL PITCH YAW from quaternion
-	double roll, pitch, yaw;
-	m.getRPY(roll, pitch, yaw);
-	
-	// Check if yaw is NaN: When yaw= NaN, then the statement yaw!=yaw is always True
-	if (yaw == yaw)
-	{
-		if (!imu_initialized)
-		{
-			imu_yaw_init = imu_yaw_init + yaw;
-			imu_cnt++;
-			if (imu_cnt >= params_.imu.imu_discarded)
-			{
-				imu_initialized = true;
-				imu_yaw_init /= static_cast<double>(imu_cnt);
-			}
-		}
-		else
-		{
-			{
-				const std::lock_guard<std::mutex> yaw_lock(yaw_mtx);
-				prev_imu_yaw = imu_yaw;
-				imu_yaw = yaw - imu_yaw_init;
-			}
-		}
-	}
-}
-
 //Update function
 void OdometryCalc::update()
 {
+	//left and right covered distances
+	double d_left, d_right;
+	// left and right speed
+	double left_speed, right_speed;
+	//Rover distance covered and angle change
+	double DeltaS, DeltaTh;
+	//Distance covered in X and Y axes
+	double DeltaX, DeltaY;
+
 	////////////////////////////////////////////////////////////////////////////////////
 	//In case we read absolute values, we need to calculate the actual elapsed pulses //
 	////////////////////////////////////////////////////////////////////////////////////
@@ -205,17 +156,17 @@ void OdometryCalc::update()
 		prev_r_pulses = right_count_abs;
 	}
 
-	//////////////////////////////////////
-	//calculate current and elapsed time//
-	//////////////////////////////////////
-	now = this->get_clock()->now();
-	elapsed = now.seconds() - then.seconds();
-
 	//////////////////////////////////////////////////
 	//calculate the distances covered left and right//
 	//////////////////////////////////////////////////
 	d_left = left_count * meters_per_tick;
 	d_right = right_count * meters_per_tick;
+
+	//////////////////////////////////////////////////
+	//calculate the left and right speed//
+	//////////////////////////////////////////////////
+	left_speed = (left_rpm * params_.mechanical.wheel_circumference) / (60.0 * params_.mechanical.reduction_ratio);
+	right_speed = (right_rpm * params_.mechanical.wheel_circumference) / (60.0 * params_.mechanical.reduction_ratio);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	//calculate the distance and angle covered, as well as the rates of change and total displacements//
@@ -223,22 +174,12 @@ void OdometryCalc::update()
 
 	//linear
 	DeltaS = (d_left + d_right) / 2.0;
-	dx = DeltaS / elapsed;
+	dx = (left_speed + right_speed) / 2.0;
 
 	//angular
-	if ((!params_.imu.enable_imu_yaw) || (params_.imu.enable_imu_yaw && !imu_initialized))
-	{
-		DeltaTh = (d_right - d_left) / params_.mechanical.track_width;
-	}
-	else
-	{
-		{
-			const std::lock_guard<std::mutex> yaw_lock(yaw_mtx);
-			DeltaTh = imu_yaw - prev_imu_yaw;
-		}		
-	}
-	dr = DeltaTh / elapsed;
-	
+	DeltaTh = (d_right - d_left) / params_.mechanical.track_width;
+	dr = (right_speed - left_speed) / params_.mechanical.track_width;
+		
 	if (DeltaS != 0)
 	{
 		DeltaX = DeltaS * cos(theta_final + (DeltaTh / 2));
@@ -257,11 +198,6 @@ void OdometryCalc::update()
 	{
 		theta_final = theta_final + 2*M_PI;
 	}
-
-	////////////////////////
-	//update previous time//
-	////////////////////////
-	then = now;
 }
 
 void OdometryCalc::OdomPub()
@@ -273,7 +209,7 @@ void OdometryCalc::OdomPub()
 	q.setRPY(0,0,theta_final);
 	odom_quat = tf2::toMsg(q);
 	nav_msgs::msg::Odometry odom;
-	odom.header.stamp = now;
+	odom.header.stamp = this->get_clock()->now();
 	odom.header.frame_id = params_.odom.odom_frame;
 	odom.pose.pose.position.x = x_final;
 	odom.pose.pose.position.y = y_final;
@@ -291,7 +227,7 @@ void OdometryCalc::TfPub()
 	/////////////////////////////////////
 	//set up and publish transformation//
 	/////////////////////////////////////
-	odom_trans.header.stamp = now;
+	odom_trans.header.stamp = this->get_clock()->now();
 	odom_trans.transform.translation.x = x_final;
 	odom_trans.transform.translation.y = y_final;
 	odom_trans.transform.rotation = odom_quat;
@@ -303,7 +239,7 @@ void OdometryCalc::TfPub()
 int main(int argc, char **argv)
 {
 	rclcpp::init(argc, argv);
-	rclcpp::executors::MultiThreadedExecutor executor;
+	rclcpp::executors::SingleThreadedExecutor executor;
 	diff_odom::OdometryCalc odom_node{};
 	executor.add_node(odom_node.get_node_base_interface());
 	executor.spin();

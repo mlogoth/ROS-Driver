@@ -45,27 +45,27 @@ RoboteqDriver::RoboteqDriver() : Node("roboteq_motor_controller_driver")
 	else if (params_.motor.channel_mode == "dual")
 	{
 		RCLCPP_INFO(LOGGER, "Driver controls two motors with a single value.");
-		cmd_vel_channel_1_sub = this->create_subscription<std_msgs::msg::Int16>("dual_cmd_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_1_vel_callback, this, _1));
-		cmd_vel_channel_2_sub = this->create_subscription<std_msgs::msg::Int16>("dual_cmd_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_2_vel_callback, this, _1));
+		cmd_vel_channel_1_sub = this->create_subscription<example_interfaces::msg::Int16>("dual_cmd_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_1_vel_callback, this, _1));
+		cmd_vel_channel_2_sub = this->create_subscription<example_interfaces::msg::Int16>("dual_cmd_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_2_vel_callback, this, _1));
 	}
 	else if (params_.motor.channel_mode == "single")
 	{
 		RCLCPP_INFO(LOGGER, "Driver controls two motors seperately.");
 		if (params_.motor.motor_1_type == "set_speed")
 		{
-			cmd_vel_channel_1_sub = this->create_subscription<std_msgs::msg::Int16>("chan_1_set_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_1_vel_callback, this, _1));
+			cmd_vel_channel_1_sub = this->create_subscription<example_interfaces::msg::Int16>("chan_1_set_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_1_vel_callback, this, _1));
 		}
 		else
 		{
-			cmd_vel_channel_1_sub = this->create_subscription<std_msgs::msg::Int16>("chan_1_go_to_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_1_vel_callback, this, _1));
+			cmd_vel_channel_1_sub = this->create_subscription<example_interfaces::msg::Int16>("chan_1_go_to_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_1_vel_callback, this, _1));
 		}
 		if (params_.motor.motor_2_type == "set_speed")
 		{
-			cmd_vel_channel_2_sub = this->create_subscription<std_msgs::msg::Int16>("chan_2_set_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_2_vel_callback, this, _1));
+			cmd_vel_channel_2_sub = this->create_subscription<example_interfaces::msg::Int16>("chan_2_set_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_2_vel_callback, this, _1));
 		}
 		else
 		{
-			cmd_vel_channel_2_sub = this->create_subscription<std_msgs::msg::Int16>("chan_2_go_to_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_2_vel_callback, this, _1));
+			cmd_vel_channel_2_sub = this->create_subscription<example_interfaces::msg::Int16>("chan_2_go_to_vel", rclcpp::SystemDefaultsQoS(), std::bind(&RoboteqDriver::channel_2_vel_callback, this, _1));
 		}
 	}
 
@@ -224,7 +224,7 @@ void RoboteqDriver::skid_steering_vel_callback(const geometry_msgs::msg::Twist &
 	ser_.flush();
 }
 
-void RoboteqDriver::channel_1_vel_callback(const std_msgs::msg::Int16 &msg)
+void RoboteqDriver::channel_1_vel_callback(const example_interfaces::msg::Int16 &msg)
 {
 	// wheel speed (m/s)
 	int cmd = msg.data;
@@ -244,7 +244,7 @@ void RoboteqDriver::channel_1_vel_callback(const std_msgs::msg::Int16 &msg)
 	ser_.flush();
 }
 
-void RoboteqDriver::channel_2_vel_callback(const std_msgs::msg::Int16 &msg)
+void RoboteqDriver::channel_2_vel_callback(const example_interfaces::msg::Int16 &msg)
 {
 	// wheel speed (m/s)
 	int cmd = msg.data;
@@ -266,7 +266,7 @@ void RoboteqDriver::channel_2_vel_callback(const std_msgs::msg::Int16 &msg)
 
 void RoboteqDriver::queryCallback()
 {
-	std_msgs::msg::String result;
+	example_interfaces::msg::String result;
 
 	if (ser_.available())
 	{
@@ -286,7 +286,6 @@ void RoboteqDriver::queryCallback()
 
 		std::vector<std::string> query_fields;
 		std::vector<std::string> sub_query_fields;
-		std::vector<int> visited_frequencies;
 
 		for (int i = static_cast<int>(fields.size()) - 2; i >= 0; i--)
 		{
@@ -295,102 +294,53 @@ void RoboteqDriver::queryCallback()
 				try
 				{
 					int frequency_index = boost::lexical_cast<int>(fields[i][2]);
-					
+
 					query_fields.clear();
 					boost::split(query_fields, fields[i], boost::algorithm::is_any_of("?"));
 
-					const bool visited = std::find(visited_frequencies.begin(), visited_frequencies.end(), frequency_index) != visited_frequencies.end();
-					const bool in_map = relative_arguments.find(frequency_index) != relative_arguments.end();
-
-					if(!visited && !in_map)
+					for (int j = 1; j < static_cast<int>(query_fields.size()); j++)
 					{
-						visited_frequencies.push_back(frequency_index);
+						sub_query_fields.clear();
+						boost::split(sub_query_fields, query_fields[j], boost::algorithm::is_any_of(":"));
 
-						for (int j = 1; j < static_cast<int>(query_fields.size()); j++)
+						example_interfaces::msg::Int64MultiArray msg;
+						for (int k = 0; k < static_cast<int>(sub_query_fields.size()); k++)
 						{
-							sub_query_fields.clear();
-							boost::split(sub_query_fields, query_fields[j], boost::algorithm::is_any_of(":"));
-
-							roboteq_motor_controller_msgs::msg::ChannelValues msg;
-							for (int k = 0; k < static_cast<int>(sub_query_fields.size()); k++)
+							try
 							{
-								try
-								{
-									msg.value.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
-								}
-								catch (const std::exception &e)
-								{
-
-									RCLCPP_ERROR_STREAM(LOGGER, "Garbage data on Serial " << fields[i] << "//" << query_fields[j] << "//" << sub_query_fields[k]);
-									std::cerr << e.what() << '\n';
-									break;
-								}
+								msg.data.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
 							}
-							query_pubs_[cum_query_size[frequency_index] + j - 1]->publish(msg);
+							catch (const std::exception &e)
+							{
+
+								RCLCPP_ERROR_STREAM(LOGGER, "Garbage data on Serial " << fields[i] << "//" << query_fields[j] << "//" << sub_query_fields[k]);
+								std::cerr << e.what() << '\n';
+								break;
+							}
 						}
+						query_pubs_[cum_query_size[frequency_index] + j - 1]->publish(msg);
 					}
-					else if(!visited && in_map)
+
+					if(both_count_and_speed_ && (both_count_and_speed_freq_index_ == frequency_index))
 					{
-						visited_frequencies.push_back(frequency_index);
+						example_interfaces::msg::Int64MultiArray odom_msg;
+
+						sub_query_fields.clear();
+						boost::split(sub_query_fields, query_fields[count_index_], boost::algorithm::is_any_of(":"));
+						for (int k = 0; k < static_cast<int>(sub_query_fields.size()); k++)
+						{
+							odom_msg.data.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
+						}
 						
-						for (int j = 1; j < static_cast<int>(query_fields.size()); j++)
+						sub_query_fields.clear();
+						boost::split(sub_query_fields, query_fields[speed_index_], boost::algorithm::is_any_of(":"));
+						for (int k = 0; k < static_cast<int>(sub_query_fields.size()); k++)
 						{
-							sub_query_fields.clear();
-							boost::split(sub_query_fields, query_fields[j], boost::algorithm::is_any_of(":"));
-
-							roboteq_motor_controller_msgs::msg::ChannelValues msg;
-							for (int k = 0; k < static_cast<int>(sub_query_fields.size()); k++)
-							{
-								try
-								{
-									msg.value.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
-								}
-								catch (const std::exception &e)
-								{
-
-									RCLCPP_ERROR_STREAM(LOGGER, "Garbage data on Serial " << fields[i] << "//" << query_fields[j] << "//" << sub_query_fields[k]);
-									std::cerr << e.what() << '\n';
-									break;
-								}
-							}
-
-							if (relative_arguments[frequency_index].find(j-1) == relative_arguments[frequency_index].end())
-							{
-								query_pubs_[cum_query_size[frequency_index] + j - 1]->publish(msg);
-							}
-							else
-							{
-								relative_arguments[frequency_index][j-1] = msg;
-							}							
+							odom_msg.data.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
 						}
-					}
-					else if(visited && !in_map)
-					{
-						continue;
-					}
-					else
-					{
-						for (auto& [key, msg] : relative_arguments[frequency_index]) 
-						{
-							sub_query_fields.clear();
-							boost::split(sub_query_fields, query_fields[key+1], boost::algorithm::is_any_of(":"));
 
-							for (int k = 0; k < static_cast<int>(sub_query_fields.size()); k++)
-							{
-								try
-								{
-									msg.value[k] += boost::lexical_cast<int>(sub_query_fields[k]);
-								}
-								catch (const std::exception &e)
-								{
-
-									RCLCPP_ERROR_STREAM(LOGGER, "Garbage data on Serial " << fields[i] << "//" << query_fields[key+1] << "//" << sub_query_fields[k]);
-									std::cerr << e.what() << '\n';
-									break;
-								}
-							}
-						}
-					}					
+						query_pubs_.back()->publish(odom_msg);
+					}
 				}
 				catch (const std::exception &e)
 				{
@@ -400,19 +350,14 @@ void RoboteqDriver::queryCallback()
 				}
 			}
 		}
-
-		for(const int& freq: visited_frequencies)
-		{
-			for(const auto& [key, value] : relative_arguments[freq])
-			{
-				query_pubs_[cum_query_size[freq] + key]->publish(value);
-			} 
-		}
 	}
 }
 
 void RoboteqDriver::formQuery(const int index, std::stringstream &ser_str)
 {
+	bool count_found;
+	bool speed_found;
+
 	if(params_.queries.queries_list_map.at(params_.queries_list[index]).arguments.size() != params_.queries.queries_list_map.at(params_.queries_list[index]).commands.size())
 	{
 		RCLCPP_ERROR_STREAM(LOGGER, params_.queries_list[index] << ": Different size of arguements and commands lists");
@@ -422,16 +367,34 @@ void RoboteqDriver::formQuery(const int index, std::stringstream &ser_str)
 	for (int i = 0; i < static_cast<int>(params_.queries.queries_list_map.at(params_.queries_list[index]).arguments.size()); i++)
 	{
 		RCLCPP_INFO_STREAM(LOGGER, params_.queries_list[index] << ": Publish topic: " << params_.queries.queries_list_map.at(params_.queries_list[index]).arguments[i]);
-		query_pubs_.push_back(this->create_publisher<roboteq_motor_controller_msgs::msg::ChannelValues>(params_.queries.ns + "/" + params_.queries.queries_list_map.at(params_.queries_list[index]).arguments[i], rclcpp::SystemDefaultsQoS()));
-		if (std::find(params_.queries.relative_arguments.begin(), params_.queries.relative_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.relative_arguments.end())
+		
+		query_pubs_.push_back(this->create_publisher<example_interfaces::msg::Int64MultiArray>(params_.ns + "/" + params_.queries.queries_list_map.at(params_.queries_list[index]).arguments[i], rclcpp::SystemDefaultsQoS()));
+		
+		count_found = std::find(params_.queries.count_arguments.begin(), params_.queries.count_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.count_arguments.end()
+					&& std::find(params_.queries.odom_arguments.begin(), params_.queries.odom_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.odom_arguments.end();
+
+		speed_found = std::find(params_.queries.speed_arguments.begin(), params_.queries.speed_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.speed_arguments.end()
+					&& std::find(params_.queries.odom_arguments.begin(), params_.queries.odom_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.odom_arguments.end();
+
+		if(count_found)
 		{
-			roboteq_motor_controller_msgs::msg::ChannelValues msg;
-			relative_arguments[index][i] = msg;
+			count_index_ = i;
 		}
+		else if (speed_found)
+		{
+			speed_index_ = i;
+		}
+		
 		ser_str << params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i] << "_";
 	}
 	
 	cum_query_size.push_back(cum_query_size.back() + params_.queries.queries_list_map.at(params_.queries_list[index]).arguments.size());
+	
+	both_count_and_speed_ = count_found && speed_found;
+	if (both_count_and_speed_)
+	{
+		both_count_and_speed_freq_index_ = index;
+	}	
 }
 
 void RoboteqDriver::run()
@@ -451,10 +414,15 @@ void RoboteqDriver::run()
 		ss_gen << "# " << 1000 / params_.queries.queries_list_map.at(params_.queries_list[i]).frequency << "_";		
 	}
 
+	if(both_count_and_speed_)
+	{
+		query_pubs_.push_back(this->create_publisher<example_interfaces::msg::Int64MultiArray>(params_.ns + "/count_and_speed", rclcpp::SystemDefaultsQoS()));
+	}
+
 	ser_.write(ss_gen.str()); // Send commands and queries
 	ser_.flush();
 	RCLCPP_INFO_STREAM(LOGGER, "Queries string: " << ss_gen.str());
-	serial_read_pub_ = this->create_publisher<std_msgs::msg::String>("read_serial", rclcpp::SystemDefaultsQoS());
+	serial_read_pub_ = this->create_publisher<example_interfaces::msg::String>("read_serial", rclcpp::SystemDefaultsQoS());
 
 	RCLCPP_INFO_STREAM(LOGGER, "Max frequency " << max_frequency);
 

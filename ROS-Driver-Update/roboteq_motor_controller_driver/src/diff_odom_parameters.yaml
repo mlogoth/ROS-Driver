@@ -35,20 +35,6 @@ diff_odom:
       default_value: 0.9925,
     }
 
-  imu:
-    enable_imu_yaw: {
-      type: bool,
-      default_value: false,
-    }
-    imu_topic: {
-      type: string,
-      default_value: "imu/data",
-    }
-    imu_discarded: {
-      type: int,
-      default_value: 100,
-    }
-
   tf:
     tf_publish: {
       type: bool,
@@ -72,3 +58,9 @@ diff_odom:
       type: string,
       default_value: "odom",
     } 
+  
+  ns: {
+    type: string,
+    default_value: "roboteq",
+    description: "Namespace for publishers"
+  }

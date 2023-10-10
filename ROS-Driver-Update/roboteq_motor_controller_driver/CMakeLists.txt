@@ -8,10 +8,10 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(roboteq_motor_controller_msgs REQUIRED)
-find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(example_interfaces REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
@@ -47,9 +47,9 @@ target_link_libraries(roboteq_motor_controller_driver
 ament_target_dependencies(roboteq_motor_controller_driver
   rclcpp
   serial
-  std_msgs
   geometry_msgs
   roboteq_motor_controller_msgs
+  example_interfaces
 )
 
 add_executable(diff_odom
@@ -72,6 +72,7 @@ ament_target_dependencies(diff_odom
   tf2
   tf2_ros
   roboteq_motor_controller_msgs
+  example_interfaces
 )
 
 install(DIRECTORY launch 

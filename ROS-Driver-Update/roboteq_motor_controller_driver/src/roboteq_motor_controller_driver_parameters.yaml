@@ -98,16 +98,27 @@ roboteq:
           unique<>: [],
         }
       }
-    relative_arguments: {
+    odom_arguments: {
       type: string_array,
-      default_value: ["?CR", "?BCR"],
-      description: "Arguments, such as relative encoder counts, whose values should not be lost/skipped.",
+      default_value: ["?CR", "?S"],
+      description: "Arguments to be joined for odometry purposes. One count and one speed argument is needed",
       validation: {
-        unique<>: [],
+        fixed_size<>: [2],
       }
     }
-    ns: {
-      type: string,
-      default_value: "roboteq",
-      description: "Namespace for publishers"
-    }   
+    count_arguments: {
+      type: string_array,
+      default_value: ["?CR", "?C", "?BCR", "?CB"],
+      description: "Count arguments.",
+    }
+    speed_arguments: {
+      type: string_array,
+      default_value: ["?S", "?BS"],
+      description: "Speed arguments.",
+    }
+  
+  ns: {
+    type: string,
+    default_value: "roboteq",
+    description: "Namespace for publishers"
+  }   

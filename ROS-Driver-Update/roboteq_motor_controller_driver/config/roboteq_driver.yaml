@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     serial:
-      port: /dev/ttyACM0
+      port: /dev/ttyROBOTEQ
       baud: 115200
 
     mechanical:
@@ -27,13 +27,8 @@
       max_vel_x: 1.5
       max_vel_ang: 1.5
 
-    imu:
-      enable_imu_yaw: false
-      # imu_topic: imu/data
-      # imu_discarded: 100
-
     tf:
-      tf_publish: true
+      tf_publish: false
       tf_header_frame: map
       tf_child_frame: base_footprint
     
@@ -46,10 +41,12 @@
     queries:
       query0:
         frequency: 30
-        arguments: [encoder_count, abs_encoder_count, feedback]
-        commands: ["?CR", "?C", "?F"]
+        arguments: [encoder_count, encoder_speed, feedback]
+        commands: ["?CR", "?S", "?F"]
       
       query1:
         frequency: 10
-        arguments: [motor_amps, motor_command, encoder_speed, fault_flag, volts, dout_status, status_flag, runtime_status_flag, internal_command, battery_amps]
-        commands: ["?A", "?M", "?S", "?FF", "?V", "?DO", "?FS", "?FM", "?CIS", "?BA"]
+        arguments: [motor_amps, motor_command, fault_flag, volts, dout_status, status_flag, runtime_status_flag, internal_command, battery_amps]
+        commands: ["?A", "?M", "?FF", "?V", "?DO", "?FS", "?FM", "?CIS", "?BA"]
+
+      odom_arguments: ["?CR", "?S"]
