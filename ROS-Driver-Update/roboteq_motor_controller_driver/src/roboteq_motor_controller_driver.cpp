@@ -287,7 +287,7 @@ void RoboteqDriver::queryCallback()
 		std::vector<std::string> query_fields;
 		std::vector<std::string> sub_query_fields;
 
-		for (int i = static_cast<int>(fields.size()) - 2; i >= 0; i--)
+		for (int i = 0; i < static_cast<int>(fields.size()) - 1; i++)
 		{
 			if (fields[i].rfind("DF", 0) == 0) // if field starts with "DF"
 			{
@@ -326,14 +326,14 @@ void RoboteqDriver::queryCallback()
 						example_interfaces::msg::Int64MultiArray odom_msg;
 
 						sub_query_fields.clear();
-						boost::split(sub_query_fields, query_fields[count_index_], boost::algorithm::is_any_of(":"));
+						boost::split(sub_query_fields, query_fields[count_index_+1], boost::algorithm::is_any_of(":"));
 						for (int k = 0; k < static_cast<int>(sub_query_fields.size()); k++)
 						{
 							odom_msg.data.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
 						}
 						
 						sub_query_fields.clear();
-						boost::split(sub_query_fields, query_fields[speed_index_], boost::algorithm::is_any_of(":"));
+						boost::split(sub_query_fields, query_fields[speed_index_+1], boost::algorithm::is_any_of(":"));
 						for (int k = 0; k < static_cast<int>(sub_query_fields.size()); k++)
 						{
 							odom_msg.data.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
@@ -355,8 +355,8 @@ void RoboteqDriver::queryCallback()
 
 void RoboteqDriver::formQuery(const int index, std::stringstream &ser_str)
 {
-	bool count_found;
-	bool speed_found;
+	bool count_found{false};
+	bool speed_found{false};
 
 	if(params_.queries.queries_list_map.at(params_.queries_list[index]).arguments.size() != params_.queries.queries_list_map.at(params_.queries_list[index]).commands.size())
 	{
@@ -370,31 +370,44 @@ void RoboteqDriver::formQuery(const int index, std::stringstream &ser_str)
 		
 		query_pubs_.push_back(this->create_publisher<example_interfaces::msg::Int64MultiArray>(params_.ns + "/" + params_.queries.queries_list_map.at(params_.queries_list[index]).arguments[i], rclcpp::SystemDefaultsQoS()));
 		
-		count_found = std::find(params_.queries.count_arguments.begin(), params_.queries.count_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.count_arguments.end()
-					&& std::find(params_.queries.odom_arguments.begin(), params_.queries.odom_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.odom_arguments.end();
-
-		speed_found = std::find(params_.queries.speed_arguments.begin(), params_.queries.speed_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.speed_arguments.end()
-					&& std::find(params_.queries.odom_arguments.begin(), params_.queries.odom_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.odom_arguments.end();
-
-		if(count_found)
-		{
-			count_index_ = i;
-		}
-		else if (speed_found)
-		{
-			speed_index_ = i;
-		}
-		
 		ser_str << params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i] << "_";
 	}
 	
 	cum_query_size.push_back(cum_query_size.back() + params_.queries.queries_list_map.at(params_.queries_list[index]).arguments.size());
-	
-	both_count_and_speed_ = count_found && speed_found;
-	if (both_count_and_speed_)
+
+	for (int i = 0; i < static_cast<int>(params_.queries.queries_list_map.at(params_.queries_list[index]).arguments.size()); i++)
 	{
-		both_count_and_speed_freq_index_ = index;
-	}	
+		count_found = (std::find(params_.queries.count_arguments.begin(), params_.queries.count_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.count_arguments.end())
+					&& (std::find(params_.queries.odom_arguments.begin(), params_.queries.odom_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.odom_arguments.end());
+		
+		if(count_found)
+		{
+			count_index_ = i;
+			break;
+		}
+	}
+
+	for (int i = 0; i < static_cast<int>(params_.queries.queries_list_map.at(params_.queries_list[index]).arguments.size()); i++)
+	{
+		speed_found = (std::find(params_.queries.speed_arguments.begin(), params_.queries.speed_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.speed_arguments.end())
+					&& (std::find(params_.queries.odom_arguments.begin(), params_.queries.odom_arguments.end(), params_.queries.queries_list_map.at(params_.queries_list[index]).commands[i]) != params_.queries.odom_arguments.end());
+
+		if (speed_found)
+		{
+			speed_index_ = i;
+			break;
+		}
+	}
+	
+	if(!both_count_and_speed_)
+	{
+		both_count_and_speed_ = count_found && speed_found;
+		if (both_count_and_speed_)
+		{
+			both_count_and_speed_freq_index_ = index;
+		}	
+	}
+	
 }
 
 void RoboteqDriver::run()
