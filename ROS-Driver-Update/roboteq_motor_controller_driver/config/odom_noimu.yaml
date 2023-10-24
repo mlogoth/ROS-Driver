@@ -12,13 +12,6 @@ encoder_cpr: 6
 encoder_min: -65536
 encoder_max: 65536 
 rate: 30 
-enable_imu_yaw: false
-imu_topic: $(arg imu_topic)
-wrapping_enabled: false
-wrp_lim: 0.3
-sub_to_abs: true
-imu_discarded: 100
-tf_publish: false
 odom_topic: odom_noimu
-tf_header_frame: $(arg prefix)odom
-tf_child_frame: $(arg prefix)base_footprint
+tf_header_frame: aristos_odom
+tf_child_frame: aristos_base_footprint
