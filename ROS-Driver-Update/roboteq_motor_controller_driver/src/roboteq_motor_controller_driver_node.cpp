@@ -259,6 +259,8 @@ private:
 			serial::Timeout to = serial::Timeout::simpleTimeout(10);
 			ser_.setTimeout(to);
 			ser_.open();
+			// Check STO signals
+			ser_.write("!STT\r");
 		}
 		catch (serial::IOException &e)
 		{
