@@ -11,6 +11,7 @@
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Int16.h>
+#include <std_srvs/Trigger.h>
 #include <iostream>
 #include <sstream>
 #include <typeinfo>
@@ -85,6 +86,7 @@ private:
 	ros::ServiceServer configsrv;
 	ros::ServiceServer commandsrv;
 	ros::ServiceServer maintenancesrv;
+	ros::ServiceServer resetstosrv;
 
 	std::vector<int> cum_query_size;
 
@@ -100,6 +102,7 @@ private:
 
 		nh_.getParam("port", port);
 		nh_.getParam("baud", baud);
+
 
 		if (!nh_.getParam("rate", rate))
 		{
@@ -496,12 +499,26 @@ private:
 		return true;
 	}
 
+	bool resetstoservice(std_srvs::Trigger::Request &request, std_srvs::Trigger::Response &response)
+	{
+		
+		ser_.write("!STT\r");
+		ser_.flush();
+		response.success=true; //= ser_.read(ser_.available());
+		response.message="STO Test message sent to serial";
+		ROS_INFO_STREAM(response.message);
+		return true;
+	}
+
+
 	void initialize_services()
 	{
 		n = ros::NodeHandle();
 		configsrv = n.advertiseService("config_service", &RoboteqDriver::configservice, this);
 		commandsrv = n.advertiseService("command_service", &RoboteqDriver::commandservice, this);
 		maintenancesrv = n.advertiseService("maintenance_service", &RoboteqDriver::maintenanceservice, this);
+		resetstosrv = n.advertiseService("reset_sto",&RoboteqDriver::resetstoservice, this);
+
 	}
 
 	void run()
