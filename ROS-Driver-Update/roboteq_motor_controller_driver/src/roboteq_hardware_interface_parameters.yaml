@@ -1,0 +1,49 @@
+roboteq_motor_controller_driver:
+  serial:
+    port: {
+      type: string,
+      read_only: true,
+    }
+    baud: {
+      type: int,
+      read_only: true,
+    }  
+  
+  queries_list: {
+    type: string_array,
+    read_only: true,
+    validation: {
+      unique<>: [],
+      subset_of<>: [["A","AI","AIC","ANG","ASI","B","BA","BCR","BRK","BMC","BMF",
+        "BMS","BS","BSC","BSR","C","CAN","CB","CD","CEC","CF","CHS","CIA","CIG",
+        "CIP","CIS","CL","CPG","CR","CSR","CSS","D","DI","DDT","DG","DO","DPA",
+        "DR","E","F","FC","FLW","FF","FID","FIN","FM","FS","HS","ICL","IG","LK",
+        "M","MA","MCB","MCU","MGD","MGM","MGS","MGT","MGY","MGX","P","PG","PHA",
+        "PI","PIC","S","SCC","SEC","SDT","SNA","SR","SS","SSR","STT","T","TM",
+        "TR","TRN","UID","V","VAR"]]
+    }
+  }
+
+  queries:
+    __map_queries_list:
+      name: {
+        type: string,
+        read_only: true,
+        validation: {
+          not_empty<>: [],
+        }
+      }
+      size: {
+        type: int,
+        read_only: true,
+        validation: {
+          gt<>: [0],
+        }
+      }
+      values: {
+        type: double_array,
+        read_only: true,
+        default_value: [],
+      }
+
+ 

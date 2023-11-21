@@ -1,0 +1,9 @@
+<library path="roboteq_motor_controller_driver_plugin">
+  <class name="roboteq_motor_controller_driver/RoboteqHardwareInterface"
+         type="roboteq_motor_controller_driver::RoboteqHardwareInterface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+		  ROS2 Control System Driver for the RoboteQ motor controller.
+    </description>
+  </class>
+</library>

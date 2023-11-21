@@ -1,0 +1,9 @@
+<library path="roboteq_broadcaster_plugin">
+  <class name="roboteq_broadcaster/RoboteqBroadcaster"
+         type="roboteq_broadcaster::RoboteqBroadcaster"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>
+		  ROS2 Broadcaster for the RoboteQ motor controller.
+    </description>
+  </class>
+</library>

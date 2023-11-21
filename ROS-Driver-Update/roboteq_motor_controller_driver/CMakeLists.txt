@@ -7,73 +7,77 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(roboteq_motor_controller_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
+find_package(hardware_interface REQUIRED)
+find_package(controller_interface REQUIRED)
+find_package(transmission_interface REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
 find_package(example_interfaces REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
 find_package(generate_parameter_library REQUIRED)
 find_package(serial REQUIRED)
+find_package(roboteq_motor_controller_msgs REQUIRED)
+find_package(realtime_tools REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
 generate_parameter_library(
-  diff_odom_parameters # cmake target name for the parameter library
-  src/diff_odom_parameters.yaml # path to input yaml file
+  roboteq_hardware_interface_parameters # cmake target name for the parameter library
+  src/roboteq_hardware_interface_parameters.yaml # path to input yaml file
 )
 
-generate_parameter_library(
-  roboteq_motor_controller_driver_parameters # cmake target name for the parameter library
-  src/roboteq_motor_controller_driver_parameters.yaml # path to input yaml file
+add_library(roboteq_motor_controller_driver_plugin
+  SHARED
+  src/roboteq_hardware_interface.cpp
 )
 
-add_executable(roboteq_motor_controller_driver
-  src/roboteq_motor_controller_driver.cpp
-)
-
-target_include_directories(roboteq_motor_controller_driver PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(roboteq_motor_controller_driver PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_link_libraries(roboteq_motor_controller_driver
+target_link_libraries(roboteq_motor_controller_driver_plugin
   rclcpp::rclcpp
-  roboteq_motor_controller_driver_parameters
+  roboteq_hardware_interface_parameters
 )
 
-ament_target_dependencies(roboteq_motor_controller_driver
+target_include_directories(roboteq_motor_controller_driver_plugin
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies(roboteq_motor_controller_driver_plugin
   rclcpp
+  rclcpp_lifecycle
+  hardware_interface
+  transmission_interface
   serial
-  geometry_msgs
-  roboteq_motor_controller_msgs
-  example_interfaces
 )
 
-add_executable(diff_odom
-  src/diff_odom.cpp
+pluginlib_export_plugin_description_file(hardware_interface roboteq_hardware_interface_plugin.xml)
+
+add_library(roboteq_broadcaster_plugin
+  SHARED
+  src/roboteq_broadcaster.cpp
 )
-target_include_directories(diff_odom PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(diff_odom PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_link_libraries(diff_odom
+
+target_link_libraries(roboteq_broadcaster_plugin
   rclcpp::rclcpp
-  diff_odom_parameters
+  roboteq_hardware_interface_parameters
 )
-ament_target_dependencies(diff_odom
+
+target_include_directories(roboteq_broadcaster_plugin
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies(roboteq_broadcaster_plugin
   rclcpp
-  nav_msgs
-  sensor_msgs
-  geometry_msgs
-  tf2_geometry_msgs
-  tf2
-  tf2_ros
+  rclcpp_lifecycle
+  controller_interface
+  realtime_tools
   roboteq_motor_controller_msgs
-  example_interfaces
 )
+
+pluginlib_export_plugin_description_file(controller_interface roboteq_broadcaster_plugin.xml)
 
 install(DIRECTORY launch 
   DESTINATION share/${PROJECT_NAME}
@@ -83,11 +87,21 @@ install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(TARGETS roboteq_motor_controller_driver
-  DESTINATION lib/${PROJECT_NAME})
+install(DIRECTORY include 
+  DESTINATION include/${PROJECT_NAME}
+)
 
-install(TARGETS diff_odom
-  DESTINATION lib/${PROJECT_NAME})
+install(TARGETS roboteq_motor_controller_driver_plugin
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS roboteq_broadcaster_plugin
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+ament_export_libraries(roboteq_motor_controller_driver_plugin)
+
+ament_export_libraries(roboteq_broadcaster_plugin)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
