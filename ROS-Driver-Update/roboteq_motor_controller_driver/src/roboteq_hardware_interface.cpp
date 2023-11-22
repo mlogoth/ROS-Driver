@@ -264,6 +264,7 @@ hardware_interface::CallbackReturn RoboteqHardwareInterface::on_configure(const 
 {
 	for (size_t i = 0; i != joints_position_transmission_passthrough_.size(); ++i)
 	{
+		joint_positions_[i] = 0.0;
 		joints_position_transmission_passthrough_[i] = kNaN;
 		joints_velocity_transmission_passthrough_[i] = kNaN;
 		actuators_position_transmission_passthrough_[i] = kNaN;
@@ -474,7 +475,6 @@ hardware_interface::return_type RoboteqHardwareInterface::read(const rclcpp::Tim
 	// actuator: state -> transmission
 	for (size_t i = 0; i != actuators_position_transmission_passthrough_.size(); ++i)
 	{
-		// TODO: POSITION INTERFACE IS RELATIVE NOW BUT MOST CONTROLLERS REQUIRE ABSOLUTE
 		actuators_position_transmission_passthrough_[i] = (params_.queries.queries_list_map.at(position_query_).values[i] / params_.encoder.cpr) * (2*M_PI); // Convert from encoder counts to rad
 	}
 
@@ -490,7 +490,7 @@ hardware_interface::return_type RoboteqHardwareInterface::read(const rclcpp::Tim
 	// joint: transmission -> state
 	for (size_t i = 0; i != joints_position_transmission_passthrough_.size(); ++i)
 	{
-		joint_positions_[i] = joints_position_transmission_passthrough_[i] ;
+		joint_positions_[i] += joints_position_transmission_passthrough_[i] ; // accumulating relative encoder changes to produce absolute position state interface
 	}
 	for (size_t i = 0; i != joints_velocity_transmission_passthrough_.size(); ++i)
 	{
