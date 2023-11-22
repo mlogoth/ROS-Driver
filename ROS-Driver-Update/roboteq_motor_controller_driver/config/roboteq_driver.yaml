@@ -1,10 +1,13 @@
 /**:
   ros__parameters:
     serial:
-      port: /dev/ttyROBOTEQ
+      port: /dev/ttyACM0
       baud: 115200
+
+    encoder:
+      cpr: 10000 # with quadrature
     
-    queries_list: ["CR", "S", "F"]
+    queries_list: ["CR", "S"]
 
     queries:
       CR:
@@ -13,6 +16,3 @@
       S:
         name: "encoder_motor_speed"
         size: 2
-      F:
-        name: "feedback"
-        size: 2    

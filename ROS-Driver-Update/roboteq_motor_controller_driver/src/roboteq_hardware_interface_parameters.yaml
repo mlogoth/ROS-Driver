@@ -7,7 +7,16 @@ roboteq_motor_controller_driver:
     baud: {
       type: int,
       read_only: true,
-    }  
+    }
+
+  encoder:
+    cpr: {
+      type: int,
+      read_only: true,
+      validation: {
+        gt<>: [0],
+      }
+    }
   
   queries_list: {
     type: string_array,

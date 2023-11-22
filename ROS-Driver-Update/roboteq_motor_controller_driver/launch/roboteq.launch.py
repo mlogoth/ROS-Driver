@@ -150,15 +150,8 @@ def generate_launch_description():
     )
     declared_arguments.append(
         DeclareLaunchArgument(
-            "update_rate_config_file",
-            default_value="roboteq_update_rate.yaml",
-            description="YAML file with the controller update rate.",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
             "initial_joint_controller",
-            default_value="diffbot_base_controller",
+            default_value="diff_drive_controller",
             description="Initially loaded robot controller.",
         )
     )

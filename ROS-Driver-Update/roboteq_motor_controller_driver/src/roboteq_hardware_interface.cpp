@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include <roboteq_motor_controller_driver/roboteq_hardware_interface.hpp>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
@@ -248,7 +250,11 @@ hardware_interface::CallbackReturn RoboteqHardwareInterface::on_init(const hardw
 			return hardware_interface::CallbackReturn::ERROR;
 		}
 		map_item.second.values.resize(map_item.second.size);
-		serial_query_ << "?" << map_item.first << "_";
+	}
+
+	for (const auto& query : params_.queries_list)
+	{
+		serial_query_ << "?" << query << "_";
 	}
 
 	return hardware_interface::CallbackReturn::SUCCESS;
@@ -403,19 +409,33 @@ hardware_interface::return_type RoboteqHardwareInterface::read(const rclcpp::Tim
 	std::vector<std::string> queries_response_list;
 
 	// Read data from serial
+	size_t max_line_size{65536};
+	std::string eol{"\r"};
+	std::string response;
+	std::string del;
+	size_t del_pos;
+	std::string key;
+	std::string data;
+
+	int data_start;
+	int data_end;
+	int i;
+
+	// TODO: CONSIDER WAITING FOR AVAILABILITY
+
 	while (ser_.available())
 	{
-		std::string response = ser_.readline();
-		std::string del{"="};
-		size_t del_pos = response.find(del);
+		response = ser_.readline(max_line_size, eol);
+
+		del = "=";
+		del_pos = response.find(del);
 		if(del_pos == std::string::npos)
-		{
-			RCLCPP_WARN(LOGGER, "Serial response without '%s' delimiter", del.c_str());
+		{	
 			continue;
 		}
 
-		std::string key = response.substr(0, del_pos);
-		std::string data = response.substr(del_pos + del.size());
+		key = response.substr(0, del_pos);
+		data = response.substr(del_pos + del.size());
 
 		if (std::find(params_.queries_list.begin(), params_.queries_list.end(), key) == params_.queries_list.end()) 
 		{
@@ -426,16 +446,14 @@ hardware_interface::return_type RoboteqHardwareInterface::read(const rclcpp::Tim
 		queries_response_list.push_back(key);
 
 		del = ":";
-		int start;
-		int end = -1*del.size();
-		int i = 0;
+		data_end = -1*del.size();
+		i = 0;
 		do {
-			start = end + del.size();
-			end = data.find(del, start);
-			std::cout << data.substr(start, end - start) << std::endl;
-			params_.queries.queries_list_map.at(key).values[i] = std::stod(data.substr(start, end - start));
+			data_start = data_end + del.size();
+			data_end = data.find(del, data_start);
+			params_.queries.queries_list_map.at(key).values[i] = std::stod(data.substr(data_start, data_end - data_start));
 			i = i + 1;
-		} while (end != -1 and i < params_.queries.queries_list_map.at(key).size);
+		} while (data_end != -1 and i < params_.queries.queries_list_map.at(key).size);
 	}
 
 	if (queries_response_list != params_.queries_list)
@@ -452,12 +470,13 @@ hardware_interface::return_type RoboteqHardwareInterface::read(const rclcpp::Tim
 	// actuator: state -> transmission
 	for (size_t i = 0; i != actuators_position_transmission_passthrough_.size(); ++i)
 	{
-		actuators_position_transmission_passthrough_[i] = params_.queries.queries_list_map.at(position_query_).values[i];
+		// TODO: POSITION INTERFACE IS RELATIVE NOW BUT MOST CONTROLLERS REQUIRE ABSOLUTE
+		actuators_position_transmission_passthrough_[i] = (params_.queries.queries_list_map.at(position_query_).values[i] / params_.encoder.cpr) * (2*M_PI); // Convert from encoder counts to rad
 	}
 
 	for (size_t i = 0; i != actuators_velocity_transmission_passthrough_.size(); ++i)
 	{
-		actuators_velocity_transmission_passthrough_[i] = params_.queries.queries_list_map.at(velocity_query_).values[i] / 60; // Conversion from RPM to 1/s
+		actuators_velocity_transmission_passthrough_[i] = (params_.queries.queries_list_map.at(velocity_query_).values[i] * (2*M_PI)) / 60; // Conversion from RPM to 1/s (rad/s)
 	}
 
 	// transmission: actuator -> joint
@@ -506,7 +525,7 @@ hardware_interface::return_type RoboteqHardwareInterface::write(const rclcpp::Ti
 		// joint: command -> transmission
 		for (size_t i = 0; i != joints_velocity_transmission_passthrough_.size(); ++i)
 		{
-			joints_velocity_transmission_passthrough_[i] = velocity_commands_[i] * 60; // Conversion to RPM from 1/s
+			joints_velocity_transmission_passthrough_[i] = (velocity_commands_[i] / (2*M_PI)) * 60; // Conversion to RPM from 1/s (rad/s)
 		}
 
 		// transmission: joint -> actuator
