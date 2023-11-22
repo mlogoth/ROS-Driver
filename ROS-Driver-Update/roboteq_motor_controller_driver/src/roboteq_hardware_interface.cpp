@@ -279,7 +279,7 @@ hardware_interface::CallbackReturn RoboteqHardwareInterface::on_activate(const r
 	{
 		ser_.setPort(params_.serial.port);
 		ser_.setBaudrate(params_.serial.baud);
-		serial::Timeout to = serial::Timeout::simpleTimeout(10);
+		serial::Timeout to = serial::Timeout::simpleTimeout(100);
 		ser_.setTimeout(to);
 		ser_.open();
 	}
@@ -421,7 +421,11 @@ hardware_interface::return_type RoboteqHardwareInterface::read(const rclcpp::Tim
 	int data_end;
 	int i;
 
-	// TODO: CONSIDER WAITING FOR AVAILABILITY
+	if(!ser_.waitReadable())
+	{
+		RCLCPP_WARN(LOGGER, "Serial timed out waiting for response");
+		return hardware_interface::return_type::OK;
+	}
 
 	while (ser_.available())
 	{
