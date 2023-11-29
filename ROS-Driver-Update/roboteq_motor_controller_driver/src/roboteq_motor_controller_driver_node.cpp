@@ -53,7 +53,7 @@ private:
 	double track_width;
 	double max_vel_x;
 	double max_vel_ang;
-	int max_rpm = 3500;
+	int max_rpm = 2600;
 	double reduction_ratio;
 	ros::Publisher read_publisher;
 	ros::Subscriber cmd_vel_sub;
@@ -104,6 +104,11 @@ private:
 		if (!nh_.getParam("rate", rate))
 		{
 			rate = 5;
+		}
+
+		if (!nh_.getParam("max_rpm", max_rpm))
+		{
+			max_rpm = 2600;
 		}
 
 		if (!nh_.getParam("channel_mode", channel_mode))
@@ -288,7 +293,7 @@ private:
 		double ln = 1.0;
 		if (mx>max_vel_wheel)
 			ln = max_vel_wheel/mx;
-
+		// std::cout << "Max RPM: "<<max_rpm << std::endl;
 		right_speed_cr = ln*right_speed;
 		left_speed_cr = ln*left_speed;
 		// std::cout<<"================================="<<std::endl;
