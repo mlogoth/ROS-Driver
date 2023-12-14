@@ -1,13 +1,13 @@
 /**:
   ros__parameters:
     serial:
-      port: /dev/ttyACM0
+      port: /dev/ttyROBOTEQ
       baud: 115200
 
     encoder:
       cpr: 10000 # with quadrature
     
-    queries_list: ["CR", "S"]
+    queries_list: ["CR", "S", "FS", "FF", "FM"]
 
     queries:
       CR:
@@ -16,3 +16,12 @@
       S:
         name: "encoder_motor_speed"
         size: 2
+      FF:
+        name: "fault_flag"
+        size: 1
+      FS:
+        name: "status_flag"
+        size: 1
+      FM:
+        name: "runtime_status_flag"
+        size: 1
