@@ -34,7 +34,7 @@ def launch_setup(context, *args, **kwargs):
     # Configuration
     roboteq_configuration = PathJoinSubstitution([FindPackageShare(config_package), "config/", config_file.perform(context)])
 
-    initial_joint_controllers = PathJoinSubstitution([FindPackageShare(config_package), "config/", controllers_file])
+    initial_joint_controllers = PathJoinSubstitution([FindPackageShare(config_package), "config/", controllers_file.perform(context)])
 
     control_node = Node(
         package="controller_manager",
@@ -42,7 +42,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             robot_description,
             roboteq_configuration,
-            ParameterFile(initial_joint_controllers, allow_substs=True),
+            initial_joint_controllers
+            # ParameterFile(initial_joint_controllers, allow_substs=True),
         ],
         output="screen",
     )
@@ -116,7 +117,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "prefix",
-            default_value="",
+            default_value="vojext",
             description="Prefix for link and joint names, for multi-robot setups",
         )
     )
