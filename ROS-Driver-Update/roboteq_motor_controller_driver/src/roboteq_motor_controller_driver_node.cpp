@@ -64,6 +64,7 @@ private:
 	std::string channel_mode;
 
 	bool safe_speed;
+	float safe_speed_scale;
 	ros::Subscriber cmd_vel_channel_1_sub;
 	ros::Subscriber cmd_vel_channel_2_sub;
 	int rate;
@@ -322,9 +323,18 @@ private:
 
 			safe_speed = false;
 		}
+
+		if (!nh_.getParam("safe_speed_scale", safe_speed_scale))
+		{
+			safe_speed_scale = 0.6;
+		}
+
 		if (safe_speed){
 			ROS_WARN_STREAM("Robot Speed in safe Mode!");
-			a = 0.6;
+			a = safe_speed_scale;
+			if ( a>1.0 && a<0.05){
+				a = 0.6;
+			}
 		}
 		// std::cout << "a: "<< a << std::endl;
 		double vw = a*msg.angular.z; 
