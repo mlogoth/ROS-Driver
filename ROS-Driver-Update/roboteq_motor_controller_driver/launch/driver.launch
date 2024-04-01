@@ -8,6 +8,8 @@
 <arg name="imu_topic" default="/aristos/imu/data"/>
 <arg name="driver_port" default="/dev/ttyS2"/>
 <arg name="odometry_enabled" default="true"/>
+<arg name="abs_count_topic" default="abs_hall_count"/>
+<arg name="count_topic" default="hall_count"/>
 
 
 <rosparam command="load" file="$(arg config_dir)" subst_value="true"/>
@@ -16,5 +18,8 @@
     <param name="pub_odom_tf" value="$(arg pub_odom_tf)" />
 </node>
 
-<node name = "diff_odom" pkg = "roboteq_motor_controller_driver" type = "diff_odom" output = "log" if="$(arg odometry_enabled)"/>
+<node name = "diff_odom" pkg = "roboteq_motor_controller_driver" type = "diff_odom" output = "screen" if="$(arg odometry_enabled)">
+    <remap from="abs_hall_count" to="$(arg abs_count_topic)"/>
+    <remap from="hall_count" to="$(arg count_topic)"/>
+</node>
 </launch>
