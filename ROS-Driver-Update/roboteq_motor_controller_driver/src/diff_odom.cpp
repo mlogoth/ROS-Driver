@@ -47,6 +47,7 @@ private:
 	//bool wrapping_enabled;
 	double wrp_lim; 
 	bool sub_to_abs;	// subscribe to abs_hall_count instead of hall_count topic to receive the total-absolute number of pulses instead of the relative number of counts
+	bool count_is_rpm; // if count topic is rpm instead of ticks or pulses
 	std::string odom_topic;
 	std::string tf_header_frame;
 	std::string tf_child_frame;
@@ -119,6 +120,8 @@ Odometry_calc::Odometry_calc(ros::NodeHandle pn)
  	ROS_INFO_STREAM("wrp_lim: " << wrp_lim);
 	pn.param("sub_to_abs", sub_to_abs, false);
  	ROS_INFO_STREAM("sub_to_abs: " << sub_to_abs);
+	pn.param("count_is_rpm", count_is_rpm, false);
+ 	ROS_INFO_STREAM("count_is_rpm: " << count_is_rpm);
 
 	//////////////////////
 	//General parameters//
@@ -155,7 +158,7 @@ Odometry_calc::Odometry_calc(ros::NodeHandle pn)
 	ROS_INFO_STREAM("rate: " << rate);
 
 	init_variables();
-	ROS_INFO("Started odometry computing node");
+	ROS_INFO("[ODOMETRY]: Odometry start computing");
 	if (sub_to_abs)
 	{
 		wheel_sub = pn.subscribe("abs_hall_count", 1, &Odometry_calc::encoderBCR, this);
@@ -164,7 +167,7 @@ Odometry_calc::Odometry_calc(ros::NodeHandle pn)
 	{
 		wheel_sub = pn.subscribe("hall_count", 1, &Odometry_calc::encoderBCR, this);
 	}
-	odom_pub = n.advertise<nav_msgs::Odometry>(odom_topic, 50);
+	odom_pub = n.advertise<nav_msgs::Odometry>(odom_topic, 10);
 	if (enable_imu_yaw)
 	{
 		imu_setup();
@@ -194,6 +197,12 @@ void Odometry_calc::init_variables()
 	if (sub_to_abs)
 	{
 		meters_per_tick = meters_per_tick / 4;
+	}
+
+	else if (count_is_rpm)
+	{
+		// wheel_circumference
+		meters_per_tick = wheel_circumference/(reduction_ratio*60);
 	}
 }
 
@@ -252,43 +261,44 @@ void Odometry_calc::update()
 		prev_r_pulses = right_count_abs;
 	}
 
-
 	//////////////////////////////////////
 	//calculate current and elapsed time//
 	//////////////////////////////////////
 	now = ros::Time::now();
 	elapsed = now.toSec() - then.toSec();
 
-	/////////////////////////////////////
-	//calculate absolute encoder values//
-	/////////////////////////////////////
-	// if (!sub_to_abs)
-	// {	
-	// 	if (wrapping_enabled)
-	// 	{
-	// 		left_count_abs = 1.0 * (left_count + lmult * (encoder_max - encoder_min));
-	// 		right_count_abs = 1.0 * (right_count + rmult * (encoder_max - encoder_min));
-	// 	}
-	// 	else
-	// 	{
-	// 		left_count_abs += left_count;
-	// 		right_count_abs += right_count;		
-	// 	}
-	// }
-
 	//////////////////////////////////////////////////
 	//calculate the distances covered left and right//
 	//////////////////////////////////////////////////
-	d_left = left_count * meters_per_tick;
-	d_right = right_count * meters_per_tick;
+	if(count_is_rpm)
+	{
+		double v_right = right_count*meters_per_tick;
+		double v_left =  left_count*meters_per_tick;
+	
+		dx = ((v_left+v_right)/2.0);
+		// From Linear velocity to linear displacement
+		DeltaS = dx*elapsed;
+		d_right=v_right*elapsed;
+		d_left=v_left*elapsed;
+		
+	}
+	else{
+		d_right = right_count*meters_per_tick;
+		d_left = left_count*meters_per_tick;
+		//linear
+		DeltaS = (d_left + d_right) / 2.0;
+		dx = DeltaS / elapsed;
+
+	}
+	
+
+
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	//calculate the distance and angle covered, as well as the rates of change and total displacements//
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	//linear
-	DeltaS = (d_left + d_right) / 2.0;
-	dx = DeltaS / elapsed;
+		
 	if (DeltaS != 0)
 	{
 		DeltaX = DeltaS * cos(theta_final + (DeltaTh / 2));

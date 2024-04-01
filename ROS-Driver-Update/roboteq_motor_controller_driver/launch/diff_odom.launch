@@ -1,10 +1,19 @@
 <launch>
+    <arg name="prefix" default="aristos_" />
 
+    <arg name="odometry_enabled" default="true"/>
+    <arg name="abs_count_topic" default="abs_hall_count"/>
+    <arg name="count_topic" default="/aristos/wheel/feedback"/>
+    <arg name="imu_topic" default="/aristos/imu/data"/>
 
-<node name = "diff_odom" pkg = "roboteq_motor_controller_driver" type = "diff_odom" output = "screen">
+    <arg name="config_dir" default="$(find roboteq_motor_controller_driver)/config/odom_test.yaml"/>
 
+    <!-- Load config parameters-->
+    <rosparam command="load" file="$(arg config_dir)" subst_value="true"/>
+    <!-- Odometry node -->
+    <node name = "diff_odom" pkg = "roboteq_motor_controller_driver" type = "diff_odom" output = "screen" if="$(arg odometry_enabled)">
+        <remap from="abs_hall_count" to="$(arg abs_count_topic)"/>
+        <remap from="hall_count" to="$(arg count_topic)"/>
+    </node>
 
-</node>
-
- 
 </launch>
