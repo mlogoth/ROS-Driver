@@ -316,9 +316,8 @@ void Odometry_calc::update()
 	}
 	else
 	{
-		//ROS_INFO_STREAM("using imu88888888888888888888888888888888888888888888888888888888");
 		theta_final = imu_yaw;
-    dr = (imu_yaw - prev_imu_yaw)/elapsed;
+    	dr = (imu_yaw - prev_imu_yaw)/elapsed;
 	}
 
 	//wrap angle values between -180 and 1800 degrees
@@ -434,19 +433,20 @@ void Odometry_calc::imu_callback(const sensor_msgs::Imu &imu)
   // Check if yaw is NaN: When yaw= NaN, then the statement yaw!=yaw is always True
   if (yaw == yaw)
   {
-    if (!imu_initialized)
+    if (imu_cnt < imu_discarded)
     {
       imu_yaw_init = imu_yaw_init + yaw;
       imu_cnt++;
-      if (imu_cnt >= imu_discarded)
+	  if (imu_cnt >= imu_discarded)
       {
-        imu_initialized = true;
+		ROS_WARN("Odometry YAW initialized!");
         imu_yaw_init /= (double)(imu_cnt);
       }
     }
     else
     {
       imu_yaw = (double)yaw - (double)imu_yaw_init;
+	  imu_initialized = true;
     }
   }
 }
