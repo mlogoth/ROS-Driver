@@ -510,7 +510,7 @@ private:
 		ser_.flush();
 		response.result = ser_.read(ser_.available());
 
-		ROS_INFO_STREAM(response.result);
+		ROS_INFO(response.result.c_str());
 		return true;
 	}
 
@@ -521,7 +521,7 @@ private:
 		ser_.flush();
 		response.success=true; //= ser_.read(ser_.available());
 		response.message="STO Test message sent to serial";
-		ROS_INFO_STREAM(response.message);
+		//ROS_INFO(response.message.c_str());
 		return true;
 	}
 
