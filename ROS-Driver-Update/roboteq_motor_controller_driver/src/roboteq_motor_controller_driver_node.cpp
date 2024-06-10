@@ -59,6 +59,11 @@ private:
 	ros::Publisher read_publisher;
 	ros::Subscriber cmd_vel_sub;
 
+	// I2T parameters
+	double amp_limit_{INT_MAX};
+	double nominal_current_{INT_MAX};
+	double time_amp_limit_{INT_MAX};
+
 	std::string motor_type;
 	std::string motor_1_type;
 	std::string motor_2_type;
@@ -92,6 +97,8 @@ private:
 	std::vector<int> cum_query_size;
 
 	void queryCallback(const ros::TimerEvent &);
+
+	bool read_i2t_parameters();
 
 	void formQuery(std::string,
 				   std::map<std::string, std::string> &,
@@ -540,6 +547,9 @@ private:
 	{
 		initialize_services();
 
+		// Read I2T parameters
+		read_i2t_parameters();
+
 		nh_.getParam("frequency_list", f_list);
 
 		std::stringstream ss_gen;
@@ -581,6 +591,150 @@ RoboteqDriver::RoboteqDriver(ros::NodeHandle nh, ros::NodeHandle nh_priv) : nh_(
 																			nh_priv_(nh_priv)
 {
 	initialize();
+}
+
+bool RoboteqDriver::read_i2t_parameters()
+{
+	// Read I2T parameters
+	std::stringstream ss_i2t;
+	ss_i2t << "^echof 1_"; // Disable echo from driver
+	ss_i2t << "# c_";	   // Clear Buffer History of previous queries
+	ss_i2t << "~ALIM_~NOMA_~TPAL_"; // Read Amps Limit, Nominal Current and Time for Amps Limit
+	ser_.write(ss_i2t.str()); // Send read commands
+	ser_.flush();
+
+	ros::Duration(1.0).sleep();
+
+	std::string result;
+	if (ser_.available())
+	{
+		result = ser_.read(ser_.available()); // Read all available bytes
+
+		std::vector<std::string> fields;
+
+		boost::split(fields, result, boost::algorithm::is_any_of("\r")); // Split by termination character "\r"
+
+		if (fields.size() < 2)
+		{
+			ROS_ERROR_STREAM(tag << "Empty data:{" << result << "}");
+			return false;
+		}
+
+		std::vector<std::string> query_fields;
+		std::vector<std::string> sub_query_fields;
+
+		for (int i = 0; i < fields.size() - 1; i++)
+		{
+			// std::cout << fields[i] << std::endl;
+			if (fields[i].rfind("ALIM", 0) == 0) // if field starts with ALIM
+			{
+				// std::cout << "Found ALIM" << std::endl;
+				query_fields.clear();
+				boost::split(query_fields, fields[i], boost::algorithm::is_any_of("="));
+				if (query_fields.size() != 2)
+				{
+					return false;
+				}
+				
+				sub_query_fields.clear();
+				boost::split(sub_query_fields, query_fields[1], boost::algorithm::is_any_of(":"));
+
+				if (sub_query_fields.size() < 1)
+				{
+					return false;
+				}
+
+				for (int k = 0; k < sub_query_fields.size(); k++)
+				{
+					try
+					{
+						amp_limit_ = std::min(amp_limit_, boost::lexical_cast<int>(sub_query_fields[k])/10.0);
+					}
+					catch (const std::exception &e)
+					{
+
+						ROS_ERROR_STREAM(tag << "Garbage data on Serial " << fields[i] << "//" << query_fields[1] << "//" << sub_query_fields[k]);
+						std::cerr << e.what() << '\n';
+						return false;
+					}
+				}
+			
+			}
+			else if (fields[i].rfind("NOMA", 0) == 0)
+			{
+				// std::cout << "Found NOMA" << std::endl;
+				query_fields.clear();
+				boost::split(query_fields, fields[i], boost::algorithm::is_any_of("="));
+				if (query_fields.size() != 2)
+				{
+					return false;
+				}
+				
+				sub_query_fields.clear();
+				boost::split(sub_query_fields, query_fields[1], boost::algorithm::is_any_of(":"));
+
+				if (sub_query_fields.size() < 1)
+				{
+					return false;
+				}
+
+				for (int k = 0; k < sub_query_fields.size(); k++)
+				{
+					try
+					{
+						nominal_current_ = std::min(nominal_current_, boost::lexical_cast<int>(sub_query_fields[k])/10.0);
+					}
+					catch (const std::exception &e)
+					{
+
+						ROS_ERROR_STREAM(tag << "Garbage data on Serial " << fields[i] << "//" << query_fields[1] << "//" << sub_query_fields[k]);
+						std::cerr << e.what() << '\n';
+						return false;
+					}
+				}
+			}
+			else if (fields[i].rfind("TPAL", 0) == 0)
+			{
+				// std::cout << "Found TPAL" << std::endl;
+				query_fields.clear();
+				boost::split(query_fields, fields[i], boost::algorithm::is_any_of("="));
+				if (query_fields.size() != 2)
+				{
+					return false;
+				}
+				
+				sub_query_fields.clear();
+				boost::split(sub_query_fields, query_fields[1], boost::algorithm::is_any_of(":"));
+
+				if (sub_query_fields.size() < 1)
+				{
+					return false;
+				}
+
+				for (int k = 0; k < sub_query_fields.size(); k++)
+				{
+					try
+					{
+						time_amp_limit_ = std::min(time_amp_limit_, boost::lexical_cast<int>(sub_query_fields[k])*1.0);
+					}
+					catch (const std::exception &e)
+					{
+
+						ROS_ERROR_STREAM(tag << "Garbage data on Serial " << fields[i] << "//" << query_fields[1] << "//" << sub_query_fields[k]);
+						std::cerr << e.what() << '\n';
+						return false;
+					}
+				}
+			}
+		}
+
+		std::cout << amp_limit_ << " " << nominal_current_ << " " << time_amp_limit_ << std::endl;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
