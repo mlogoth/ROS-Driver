@@ -60,9 +60,14 @@ private:
 	ros::Subscriber cmd_vel_sub;
 
 	// I2T parameters
-	double amp_limit_{INT_MAX};
-	double nominal_current_{INT_MAX};
-	double time_amp_limit_{INT_MAX};
+	std::vector<double> amp_limit_;
+	std::vector<double> nominal_current_;
+	std::vector<double> time_amp_limit_;
+	std::vector<double> i2t_limit_;
+	int motor_amps_index_{-1};
+	int runtime_status_flags_index_{-1};
+	roboteq_motor_controller_driver::channel_values motor_amps_;
+	roboteq_motor_controller_driver::channel_values runtime_status_flags_;
 
 	std::string motor_type;
 	std::string motor_1_type;
@@ -548,7 +553,10 @@ private:
 		initialize_services();
 
 		// Read I2T parameters
-		read_i2t_parameters();
+		if (!read_i2t_parameters())
+		{
+			ROS_ERROR("Reading I2T parameters failed");
+		}		
 
 		nh_.getParam("frequency_list", f_list);
 
@@ -633,6 +641,7 @@ bool RoboteqDriver::read_i2t_parameters()
 				boost::split(query_fields, fields[i], boost::algorithm::is_any_of("="));
 				if (query_fields.size() != 2)
 				{
+					ROS_ERROR_STREAM(tag << "Serial data is not as expected");
 					return false;
 				}
 				
@@ -641,6 +650,7 @@ bool RoboteqDriver::read_i2t_parameters()
 
 				if (sub_query_fields.size() < 1)
 				{
+					ROS_ERROR_STREAM(tag << "Serial data is not as expected");
 					return false;
 				}
 
@@ -648,7 +658,7 @@ bool RoboteqDriver::read_i2t_parameters()
 				{
 					try
 					{
-						amp_limit_ = std::min(amp_limit_, boost::lexical_cast<int>(sub_query_fields[k])/10.0);
+						amp_limit_.push_back(boost::lexical_cast<int>(sub_query_fields[k])/10.0);
 					}
 					catch (const std::exception &e)
 					{
@@ -667,6 +677,7 @@ bool RoboteqDriver::read_i2t_parameters()
 				boost::split(query_fields, fields[i], boost::algorithm::is_any_of("="));
 				if (query_fields.size() != 2)
 				{
+					ROS_ERROR_STREAM(tag << "Serial data is not as expected");
 					return false;
 				}
 				
@@ -675,6 +686,7 @@ bool RoboteqDriver::read_i2t_parameters()
 
 				if (sub_query_fields.size() < 1)
 				{
+					ROS_ERROR_STREAM(tag << "Serial data is not as expected");
 					return false;
 				}
 
@@ -682,7 +694,7 @@ bool RoboteqDriver::read_i2t_parameters()
 				{
 					try
 					{
-						nominal_current_ = std::min(nominal_current_, boost::lexical_cast<int>(sub_query_fields[k])/10.0);
+						nominal_current_.push_back(boost::lexical_cast<int>(sub_query_fields[k])/10.0);
 					}
 					catch (const std::exception &e)
 					{
@@ -700,6 +712,7 @@ bool RoboteqDriver::read_i2t_parameters()
 				boost::split(query_fields, fields[i], boost::algorithm::is_any_of("="));
 				if (query_fields.size() != 2)
 				{
+					ROS_ERROR_STREAM(tag << "Serial data is not as expected");
 					return false;
 				}
 				
@@ -708,6 +721,7 @@ bool RoboteqDriver::read_i2t_parameters()
 
 				if (sub_query_fields.size() < 1)
 				{
+					ROS_ERROR_STREAM(tag << "Serial data is not as expected");
 					return false;
 				}
 
@@ -715,7 +729,7 @@ bool RoboteqDriver::read_i2t_parameters()
 				{
 					try
 					{
-						time_amp_limit_ = std::min(time_amp_limit_, boost::lexical_cast<int>(sub_query_fields[k])*1.0);
+						time_amp_limit_.push_back(boost::lexical_cast<int>(sub_query_fields[k])*1.0);
 					}
 					catch (const std::exception &e)
 					{
@@ -728,12 +742,24 @@ bool RoboteqDriver::read_i2t_parameters()
 			}
 		}
 
-		std::cout << amp_limit_ << " " << nominal_current_ << " " << time_amp_limit_ << std::endl;
-		return true;
+		if (amp_limit_.size() == nominal_current_.size() && amp_limit_.size() == time_amp_limit_.size())
+		{
+			for (int i = 0; i < amp_limit_.size(); i++)
+			{
+				i2t_limit_.push_back((amp_limit_[i]*amp_limit_[i] - nominal_current_[i]*nominal_current_[i])*time_amp_limit_[i]);
+				ROS_INFO_STREAM(tag << "Channel " << i << ", Amp Limit: " << amp_limit_[i] << ", Nominal Current: " << nominal_current_[i] << ", Time Amp Limit: " << time_amp_limit_[i] << ", I2T Limit: " << i2t_limit_[i]);
+			}
+			return true;
+		}
+		else
+		{
+			ROS_ERROR_STREAM(tag << "Channel number is not consistent among parameters");
+			return false;
+		}
 	}
 	else
 	{
-		return false;
+		ROS_ERROR_STREAM(tag << "No serial data available");
 	}
 }
 
@@ -799,6 +825,16 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 							}
 						}
 						query_pub_[cum_query_size[frequency_index] + j - 1].publish(msg);
+
+						// Save motor amps values and runtime status flags for I2T check
+						if (cum_query_size[frequency_index] + j - 1 == motor_amps_index_)
+						{
+							motor_amps_ = msg;
+						}
+						else if (cum_query_size[frequency_index] + j - 1 == runtime_status_flags_index_)
+						{
+							runtime_status_flags_ = msg;
+						}
 					}
 				}
 				catch (const std::exception &e)
@@ -808,6 +844,30 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 					continue;
 				}
 			}
+		}
+
+		// I2T check
+		if (motor_amps_index_ != -1 && runtime_status_flags_index_ != -1 && runtime_status_flags_.value.size() == motor_amps_.value.size())
+		{
+			for(int i=0; i < runtime_status_flags_.value.size(); i++)
+			{
+				// Check if Amp Limit is present
+				if (runtime_status_flags_.value[i] % 2 == 1)
+				{
+					if (motor_amps_.value[i]/10.0 > 0.8 * nominal_current_[i])
+					{
+						ROS_WARN_STREAM(tag << "AmpLim protection in Channel: " << i);
+					}
+					else
+					{
+						ROS_WARN_STREAM(tag << "I2T protection in Channel: " << i);
+					}
+				}
+			}
+		}
+		else
+		{
+			ROS_ERROR_STREAM(tag << "Cannot perform I2T check");
 		}
 	}
 	previous_time = ros::Time::now();
@@ -827,6 +887,16 @@ void RoboteqDriver::formQuery(std::string param,
 
 		std::string cmd = iter->second;
 		ser_str << cmd << "_";
+
+		// Find motor amps and runtime status flags
+		if (iter->second == "?A")
+		{
+			motor_amps_index_ = count + (cum_query_size.empty() ? 0 : cum_query_size.back());
+		}
+		else if (iter->second == "?FM")
+		{
+			runtime_status_flags_index_ = count + (cum_query_size.empty() ? 0 : cum_query_size.back());
+		}
 		count++;
 	}
 	if (!cum_query_size.empty())
