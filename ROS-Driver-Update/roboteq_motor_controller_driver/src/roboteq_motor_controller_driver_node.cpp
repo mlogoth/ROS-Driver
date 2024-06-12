@@ -68,6 +68,7 @@ private:
 	int runtime_status_flags_index_{-1};
 	roboteq_motor_controller_driver::channel_values motor_amps_;
 	roboteq_motor_controller_driver::channel_values runtime_status_flags_;
+	ros::Publisher i2t_pub_;
 
 	std::string motor_type;
 	std::string motor_1_type;
@@ -586,6 +587,7 @@ private:
 		ser_.flush();
 		ROS_INFO_STREAM(tag << ss_gen.str());
 		serial_read_pub_ = nh_.advertise<std_msgs::String>("read_serial", 1000);
+		i2t_pub_ = nh_.advertise<roboteq_motor_controller_driver::channel_values>("i2t", 1000);
 
 		double max_freq;
 		max_freq = *std::max_element(f_list.begin(), f_list.end());
@@ -847,23 +849,27 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 		}
 
 		// I2T check
+		roboteq_motor_controller_driver::channel_values i2t_flag;
 		if (motor_amps_index_ != -1 && runtime_status_flags_index_ != -1 && runtime_status_flags_.value.size() == motor_amps_.value.size())
 		{
 			for(int i=0; i < runtime_status_flags_.value.size(); i++)
 			{
+				i2t_flag.value.push_back(0);
 				// Check if Amp Limit is present
 				if (runtime_status_flags_.value[i] % 2 == 1)
 				{
-					if (motor_amps_.value[i]/10.0 > 0.8 * nominal_current_[i])
+					if (std::abs(motor_amps_.value[i])/10.0 > 0.85 * nominal_current_[i])
 					{
 						ROS_WARN_STREAM(tag << "AmpLim protection in Channel: " << i);
 					}
 					else
 					{
 						ROS_WARN_STREAM(tag << "I2T protection in Channel: " << i);
+						i2t_flag.value.back()= 1;
 					}
 				}
 			}
+			i2t_pub_.publish(i2t_flag);
 		}
 		else
 		{
