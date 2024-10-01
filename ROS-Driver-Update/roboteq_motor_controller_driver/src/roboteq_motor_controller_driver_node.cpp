@@ -858,7 +858,7 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 				// Check if Amp Limit is present
 				if (runtime_status_flags_.value[i] % 2 == 1)
 				{
-					if (std::abs(motor_amps_.value[i])/10.0 > 0.85 * nominal_current_[i])
+					if (std::abs(motor_amps_.value[i])/10.0 > 1.1 * nominal_current_[i])
 					{
 						ROS_WARN_STREAM(tag << "AmpLim protection in Channel: " << i);
 					}
