@@ -77,6 +77,7 @@ private:
 	// added in changes
 	ros::NodeHandle nh_priv_;
 	std::vector<int> f_list; // a list of frequencies for the queries to be published
+	std::vector<std_msgs::Header> headers;
 	std::vector<ros::Publisher> query_pub_;
 	ros::NodeHandle nh_;
 	ros::Timer timer_pub_;
@@ -526,7 +527,6 @@ private:
 		return true;
 	}
 
-
 	void initialize_services()
 	{
 		n = ros::NodeHandle();
@@ -569,6 +569,11 @@ private:
 		ser_.flush();
 		ROS_INFO_STREAM(tag << ss_gen.str());
 		serial_read_pub_ = nh_.advertise<std_msgs::String>("read_serial", 1000);
+
+		// Initialize headers
+		std_msgs::Header init_msg;
+		init_msg.stamp = ros::Time::now();
+		headers.resize(f_list.size(), init_msg);
 
 		double max_freq;
 		max_freq = *std::max_element(f_list.begin(), f_list.end());
@@ -641,6 +646,7 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 					boost::split(sub_query_fields, query_fields[j], boost::algorithm::is_any_of(":"));
 
 					roboteq_motor_controller_driver::channel_values msg;
+					msg.header = headers[frequency_index];
 					for (int k = 0; k < sub_query_fields.size(); k++)
 					{
 						try
@@ -663,6 +669,7 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 				std::cerr << e.what() << '\n';
 				ROS_ERROR_STREAM(tag << "Finding query output in :" << message);
 			}
+			headers[frequency_index].stamp += ros::Duration(1.0/f_list[frequency_index]);
 		}
 	}
 	previous_time = ros::Time::now();
