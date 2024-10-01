@@ -14,7 +14,7 @@
 
 <rosparam command="load" file="$(arg config_dir)" subst_value="true"/>
 
-<node name = "roboteq_motor_controller_driver" pkg = "roboteq_motor_controller_driver" type = "roboteq_motor_controller_driver_node" output = "log" respawn="true">
+<node name = "roboteq_motor_controller_driver" pkg = "roboteq_motor_controller_driver" type = "roboteq_motor_controller_driver_node" output = "screen" respawn="true">
     <param name="pub_odom_tf" value="$(arg pub_odom_tf)" />
 </node>
 
