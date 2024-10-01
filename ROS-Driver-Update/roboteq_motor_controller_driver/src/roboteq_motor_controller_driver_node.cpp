@@ -574,7 +574,7 @@ private:
 		max_freq = *std::max_element(f_list.begin(), f_list.end());
 		ROS_INFO_STREAM(tag << " max frequency " << max_freq);
 		previous_time = ros::Time::now();
-		timer_pub_ = nh_.createTimer(ros::Duration(double(1.0 / (2.5*max_freq))), &RoboteqDriver::queryCallback, this);
+		timer_pub_ = nh_.createTimer(ros::Duration(double(1.0 / (2.0*max_freq))), &RoboteqDriver::queryCallback, this);
 	}
 };
 
@@ -605,61 +605,64 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 		// Append data to buffer
 		buffer += result.data;
 
-		// Look for start and end sequences in buffer
-		std::size_t start_idx = buffer.find("DF");
-		if(start_idx == std::string::npos)
+		while(true)
 		{
-			return;
-		}
-
-		std::size_t end_idx = buffer.find("\r", start_idx + 1);
-		if(end_idx == std::string::npos)
-		{
-			return;
-		}
-
-		// Extract message from buffer
-		std::string message = buffer.substr(start_idx, end_idx - start_idx);
-
-		// Erase message from buffer
-		buffer = buffer.erase(0, end_idx);
-
-		// Decode
-		int frequency_index = boost::lexical_cast<int>(message[2]);
-		std::vector<std::string> query_fields;
-		std::vector<std::string> sub_query_fields;
-
-		try
-		{
-			query_fields.clear();
-			boost::split(query_fields, message, boost::algorithm::is_any_of("?"));
-			for (int j = 1; j < query_fields.size(); j++)
+			// Look for start and end sequences in buffer
+			std::size_t start_idx = buffer.find("DF");
+			if(start_idx == std::string::npos)
 			{
-				sub_query_fields.clear();
-				boost::split(sub_query_fields, query_fields[j], boost::algorithm::is_any_of(":"));
-
-				roboteq_motor_controller_driver::channel_values msg;
-				for (int k = 0; k < sub_query_fields.size(); k++)
-				{
-					try
-					{
-						msg.value.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
-					}
-					catch (const std::exception &e)
-					{
-
-						ROS_ERROR_STREAM(tag << "Garbage data on Serial " << message << "//" << query_fields[j] << "//" << sub_query_fields[k]);
-						std::cerr << e.what() << '\n';
-						break;
-					}
-				}
-				query_pub_[cum_query_size[frequency_index] + j - 1].publish(msg);
+				return;
 			}
-		}
-		catch (const std::exception &e)
-		{
-			std::cerr << e.what() << '\n';
-			ROS_ERROR_STREAM(tag << "Finding query output in :" << message);
+
+			std::size_t end_idx = buffer.find("\r", start_idx + 1);
+			if(end_idx == std::string::npos)
+			{
+				return;
+			}
+
+			// Extract message from buffer
+			std::string message = buffer.substr(start_idx, end_idx - start_idx);
+
+			// Erase message from buffer
+			buffer = buffer.erase(0, end_idx);
+
+			// Decode
+			int frequency_index = boost::lexical_cast<int>(message[2]);
+			std::vector<std::string> query_fields;
+			std::vector<std::string> sub_query_fields;
+
+			try
+			{
+				query_fields.clear();
+				boost::split(query_fields, message, boost::algorithm::is_any_of("?"));
+				for (int j = 1; j < query_fields.size(); j++)
+				{
+					sub_query_fields.clear();
+					boost::split(sub_query_fields, query_fields[j], boost::algorithm::is_any_of(":"));
+
+					roboteq_motor_controller_driver::channel_values msg;
+					for (int k = 0; k < sub_query_fields.size(); k++)
+					{
+						try
+						{
+							msg.value.push_back(boost::lexical_cast<int>(sub_query_fields[k]));
+						}
+						catch (const std::exception &e)
+						{
+
+							ROS_ERROR_STREAM(tag << "Garbage data on Serial " << message << "//" << query_fields[j] << "//" << sub_query_fields[k]);
+							std::cerr << e.what() << '\n';
+							break;
+						}
+					}
+					query_pub_[cum_query_size[frequency_index] + j - 1].publish(msg);
+				}
+			}
+			catch (const std::exception &e)
+			{
+				std::cerr << e.what() << '\n';
+				ROS_ERROR_STREAM(tag << "Finding query output in :" << message);
+			}
 		}
 	}
 	previous_time = ros::Time::now();
