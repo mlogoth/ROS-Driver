@@ -638,6 +638,10 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 
 			try
 			{
+				if ((ros::Time::now() - headers[frequency_index].stamp).toSec() < 0)
+				{
+					headers[frequency_index].stamp = ros::Time::now();
+				}
 				query_fields.clear();
 				boost::split(query_fields, message, boost::algorithm::is_any_of("?"));
 				for (int j = 1; j < query_fields.size(); j++)
@@ -663,6 +667,7 @@ void RoboteqDriver::queryCallback(const ros::TimerEvent &event)
 					}
 					query_pub_[cum_query_size[frequency_index] + j - 1].publish(msg);
 				}
+				// std::cout << ros::Time::now() - headers[frequency_index].stamp << std::endl;
 			}
 			catch (const std::exception &e)
 			{
