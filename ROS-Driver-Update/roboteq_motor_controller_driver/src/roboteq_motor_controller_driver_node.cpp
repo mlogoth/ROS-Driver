@@ -7,6 +7,7 @@
 
 #include <serial/serial.h>
 #include <ros/ros.h>
+#include <thread>
 #include <std_msgs/String.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
@@ -521,7 +522,7 @@ void RoboteqDriver::run()
 	max_freq = *std::max_element(f_list.begin(), f_list.end());
 	ROS_INFO_STREAM(tag << " max frequency " << max_freq);
 
-	read_roboteq_output();
+	std::thread{std::bind(&RoboteqDriver::read_roboteq_output, this)}.detach();
 }
 
 void RoboteqDriver::initialize_services()
@@ -625,7 +626,7 @@ void RoboteqDriver::read_roboteq_output()
 		ser_.read(ser_.available());
 	}
 
-	while (ros::ok())
+	while (ros::ok() && ser_.isOpen())
 	{
 		message = ser_.readline(max_response_size, delimiter); // Read up to delimiter
 		if (message.size() == 0 || (message[0] != 'D' && message[1] != 'F'))
