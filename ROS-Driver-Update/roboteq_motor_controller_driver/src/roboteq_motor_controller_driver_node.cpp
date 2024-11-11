@@ -1,31 +1,28 @@
-// #include <roboteq_motor_controller_driver/roboteq_motor_controller_driver_node.h>
-#include <boost/lexical_cast.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/algorithm/string/classification.hpp>
-
-#include <serial/serial.h>
-#include <ros/ros.h>
-#include <thread>
-#include <std_msgs/String.h>
-#include <std_msgs/Empty.h>
-#include <std_msgs/Bool.h>
-#include <std_msgs/Int16.h>
-#include <std_srvs/Trigger.h>
-#include <iostream>
-#include <sstream>
-#include <typeinfo>
-#include <cassert>
 #include <mutex>
 #include <math.h>
-#include <geometry_msgs/Twist.h>
-#include <nav_msgs/Odometry.h>
+#include <thread>
+#include <sstream>
+#include <cassert>
+#include <iostream>
+#include <typeinfo>
+
 #include <tf/tf.h>
-#include <roboteq_motor_controller_driver/querylist.h>
-#include <roboteq_motor_controller_driver/channel_values.h>
+#include <ros/ros.h>
+#include <serial/serial.h>
+#include <std_msgs/Bool.h>
+#include <std_msgs/Empty.h>
+#include <std_msgs/Int16.h>
+#include <std_msgs/String.h>
+#include <std_srvs/Trigger.h>
+#include <geometry_msgs/Twist.h>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
+
 #include <roboteq_motor_controller_driver/config_srv.h>
 #include <roboteq_motor_controller_driver/command_srv.h>
+#include <roboteq_motor_controller_driver/channel_values.h>
 #include <roboteq_motor_controller_driver/maintenance_srv.h>
 
 template <typename T> float sgn(T val) {
@@ -52,6 +49,7 @@ public:
 private:	
 	void connect();
 	void initialize();
+	bool read_i2t_parameters();
 	void read_roboteq_output();
 	void initialize_services();
 	void dual_vel_callback(const std_msgs::Int16 &msg);
@@ -79,6 +77,7 @@ private:
 	ros::Subscriber cmd_vel_channel_1_sub;
 	ros::Subscriber cmd_vel_channel_2_sub;
 
+	ros::Publisher i2t_pub_;
 	ros::Publisher serial_read_pub_;
 
 	std::vector<int> f_list; // a list of frequencies for the queries to be published
@@ -102,7 +101,17 @@ private:
 	std::string motor_type;
 	std::string motor_1_type;
 	std::string motor_2_type;
-	std::string channel_mode;	
+	std::string channel_mode;
+
+	// I2T parameters
+	int motor_amps_index_{-1};
+	int runtime_status_flags_index_{-1};
+	std::vector<double> amp_limit_;
+	std::vector<double> i2t_limit_;
+	std::vector<double> time_amp_limit_;
+	std::vector<double> nominal_current_;	
+	roboteq_motor_controller_driver::channel_values motor_amps_;
+	roboteq_motor_controller_driver::channel_values runtime_status_flags_;	
 };
 
 RoboteqDriver::RoboteqDriver(ros::NodeHandle nh, ros::NodeHandle nh_priv) : nh_(nh), nh_priv_(nh_priv)
@@ -173,28 +182,6 @@ void RoboteqDriver::initialize()
 			motor_2_type = "set_speed";
 		}
 	}
-
-	// if ((channel_mode == "dual") && (!nh_.getParam("motor_1_type", motor_1_type)) && motor_type !="skid_steering")
-	// {
-	// 	ROS_ERROR_STREAM("No motor type was found for motor 1. Shutting down.");
-	// 	ros::shutdown();
-	// }
-	// if ((channel_mode == "dual") && (!nh_.getParam("motor_2_type", motor_2_type)) && motor_type !="skid_steering")
-	// {
-	// 	ROS_ERROR_STREAM("No motor type was found for motor 2. Shutting down.");
-	// 	ros::shutdown();
-	// }
-
-	// if ((channel_mode == "single") && (!nh_.getParam("motor_1_type", motor_1_type)))
-	// {
-	// 	ROS_ERROR_STREAM("No motor type was found for motor 1. Shutting down.");
-	// 	ros::shutdown();
-	// }
-	// if ((channel_mode == "single") && (!nh_.getParam("motor_2_type", motor_2_type)))
-	// {
-	// 	ROS_ERROR_STREAM("No motor type was found for motor 2. Shutting down.");
-	// 	ros::shutdown();
-	// }
 
 	if (motor_type == "skid_steering")
 	{
@@ -456,7 +443,6 @@ void RoboteqDriver::connect()
 {
 	try
 	{
-
 		ser_.setPort(port);
 		ser_.setBaudrate(baud); // get baud as param
 		serial::Timeout to = serial::Timeout::simpleTimeout(10);
@@ -467,19 +453,15 @@ void RoboteqDriver::connect()
 	}
 	catch (serial::IOException &e)
 	{
-
 		ROS_ERROR_STREAM("Unable to open port ");
 		ROS_INFO_STREAM("Unable to open port");
-		;
 	}
 	if (ser_.isOpen())
 	{
-
 		ROS_INFO_STREAM("Serial Port initialized\"");
 	}
 	else
 	{
-		// ROS_INFO_STREAM("HI4");
 		ROS_INFO_STREAM("Serial Port is not open");
 	}
 	run();
@@ -488,6 +470,12 @@ void RoboteqDriver::connect()
 void RoboteqDriver::run()
 {
 	initialize_services();
+
+	// Read I2T parameters
+	if (!read_i2t_parameters())
+	{
+		ROS_ERROR("Reading I2T parameters failed");
+	}	
 
 	nh_.getParam("frequency_list", f_list);
 
@@ -517,6 +505,7 @@ void RoboteqDriver::run()
 	ser_.flush();
 	ROS_INFO_STREAM(tag << ss_gen.str());
 	serial_read_pub_ = nh_.advertise<std_msgs::String>("read_serial", 1000);
+	i2t_pub_ = nh_.advertise<roboteq_motor_controller_driver::channel_values>("i2t", 1000);
 
 	double max_freq;
 	max_freq = *std::max_element(f_list.begin(), f_list.end());
@@ -582,6 +571,154 @@ bool RoboteqDriver::resetstoservice(std_srvs::Trigger::Request &request, std_srv
 	return true;
 }
 
+bool RoboteqDriver::read_i2t_parameters()
+{
+	// Read I2T parameters
+	// Flush both input and output to sync
+	ser_.flush();
+	while (ser_.available())
+	{
+		ser_.read(ser_.available());
+	}
+	
+	std::stringstream ss_i2t;
+	ss_i2t << "^echof 1_"; // Disable echo from driver
+	ss_i2t << "# c_";	   // Clear Buffer History of previous queries
+	ss_i2t << "~ALIM_~NOMA_~TPAL_"; // Read Amps Limit, Nominal Current and Time for Amps Limit
+	ser_.write(ss_i2t.str()); // Send read commands
+	ser_.flush();
+
+	ros::Duration(1.0).sleep();
+
+	std::string result;
+	std::string delimiter{"\r"};
+	size_t max_response_size = 65536;
+	
+	while (ser_.available())
+	{
+		result = ser_.readline(max_response_size, delimiter); // Read up to delimiter		
+		result = result.substr(0, result.size()-1); // Remove delimiter from end
+
+		std::vector<std::string> query_fields;
+		std::vector<std::string> sub_query_fields;
+
+		if (result.rfind("ALIM", 0) == 0) // if result starts with ALIM
+		{
+			query_fields.clear();
+			boost::split(query_fields, result, boost::algorithm::is_any_of("="));
+			if (query_fields.size() != 2)
+			{
+				ROS_ERROR_STREAM(tag << "Serial data is not as expected");
+				return false;
+			}
+			
+			sub_query_fields.clear();
+			boost::split(sub_query_fields, query_fields[1], boost::algorithm::is_any_of(":"));
+
+			if (sub_query_fields.size() < 1)
+			{
+				ROS_ERROR_STREAM(tag << "Serial data is not as expected");
+				return false;
+			}
+
+			for (int k = 0; k < sub_query_fields.size(); k++)
+			{
+				try
+				{
+					amp_limit_.push_back(boost::lexical_cast<int>(sub_query_fields[k])/10.0);
+				}
+				catch (const std::exception &e)
+				{
+					ROS_ERROR_STREAM(tag << "Garbage data on Serial " << result << "//" << query_fields[1] << "//" << sub_query_fields[k]);
+					std::cerr << e.what() << '\n';
+					return false;
+				}
+			}		
+		}
+		else if (result.rfind("NOMA", 0) == 0)
+		{
+			query_fields.clear();
+			boost::split(query_fields, result, boost::algorithm::is_any_of("="));
+			if (query_fields.size() != 2)
+			{
+				ROS_ERROR_STREAM(tag << "Serial data is not as expected");
+				return false;
+			}
+			
+			sub_query_fields.clear();
+			boost::split(sub_query_fields, query_fields[1], boost::algorithm::is_any_of(":"));
+
+			if (sub_query_fields.size() < 1)
+			{
+				ROS_ERROR_STREAM(tag << "Serial data is not as expected");
+				return false;
+			}
+
+			for (int k = 0; k < sub_query_fields.size(); k++)
+			{
+				try
+				{
+					nominal_current_.push_back(boost::lexical_cast<int>(sub_query_fields[k])/10.0);
+				}
+				catch (const std::exception &e)
+				{
+					ROS_ERROR_STREAM(tag << "Garbage data on Serial " << result << "//" << query_fields[1] << "//" << sub_query_fields[k]);
+					std::cerr << e.what() << '\n';
+					return false;
+				}
+			}
+		}
+		else if (result.rfind("TPAL", 0) == 0)
+		{
+			query_fields.clear();
+			boost::split(query_fields, result, boost::algorithm::is_any_of("="));
+			if (query_fields.size() != 2)
+			{
+				ROS_ERROR_STREAM(tag << "Serial data is not as expected");
+				return false;
+			}
+			
+			sub_query_fields.clear();
+			boost::split(sub_query_fields, query_fields[1], boost::algorithm::is_any_of(":"));
+
+			if (sub_query_fields.size() < 1)
+			{
+				ROS_ERROR_STREAM(tag << "Serial data is not as expected");
+				return false;
+			}
+
+			for (int k = 0; k < sub_query_fields.size(); k++)
+			{
+				try
+				{
+					time_amp_limit_.push_back(boost::lexical_cast<int>(sub_query_fields[k])*1.0);
+				}
+				catch (const std::exception &e)
+				{
+					ROS_ERROR_STREAM(tag << "Garbage data on Serial " << result << "//" << query_fields[1] << "//" << sub_query_fields[k]);
+					std::cerr << e.what() << '\n';
+					return false;
+				}
+			}
+		}
+	}		
+
+	if (amp_limit_.size() == nominal_current_.size() && amp_limit_.size() == time_amp_limit_.size())
+	{
+		for (int i = 0; i < amp_limit_.size(); i++)
+		{
+			i2t_limit_.push_back((amp_limit_[i]*amp_limit_[i] - nominal_current_[i]*nominal_current_[i])*time_amp_limit_[i]);
+			ROS_INFO_STREAM(tag << "Channel " << i << ", Amp Limit: " << amp_limit_[i] << ", Nominal Current: " << nominal_current_[i] << ", Time Amp Limit: " << time_amp_limit_[i] << ", I2T Limit: " << i2t_limit_[i]);
+		}
+		return true;
+	}
+	else
+	{
+		ROS_ERROR_STREAM(tag << "Number of channels is not consistent among parameters");
+		return false;
+	}	
+}
+
 void RoboteqDriver::formQuery(std::string param, std::map<std::string, std::string> &queries, std::vector<ros::Publisher> &pubs, std::stringstream &ser_str)
 {
 	nh_.getParam(param, queries);
@@ -593,6 +730,17 @@ void RoboteqDriver::formQuery(std::string param, std::map<std::string, std::stri
 
 		std::string cmd = iter->second;
 		ser_str << cmd << "_";
+		
+		// Find motor amps and runtime status flags
+		if (iter->second == "?A")
+		{
+			motor_amps_index_ = count + (cum_query_size.empty() ? 0 : cum_query_size.back());
+		}
+		else if (iter->second == "?FM")
+		{
+			runtime_status_flags_index_ = count + (cum_query_size.empty() ? 0 : cum_query_size.back());
+		}
+
 		count++;
 	}
 	if (!cum_query_size.empty())
@@ -618,6 +766,7 @@ void RoboteqDriver::read_roboteq_output()
 	std::vector<std::string> query_fields;
 	std::vector<std::string> sub_query_fields;
 	roboteq_motor_controller_driver::channel_values msg;
+	roboteq_motor_controller_driver::channel_values i2t_flag;
 
 	// Flush both input and output to sync
 	ser_.flush();
@@ -670,12 +819,51 @@ void RoboteqDriver::read_roboteq_output()
 					}
 				}
 				query_pub_[cum_query_size[frequency_index] + j - 1].publish(msg);
+
+				// Save motor amps values and runtime status flags for I2T check
+				if (cum_query_size[frequency_index] + j - 1 == motor_amps_index_)
+				{
+					motor_amps_ = msg;
+				}
+				else if (cum_query_size[frequency_index] + j - 1 == runtime_status_flags_index_)
+				{
+					runtime_status_flags_ = msg;
+				}
 			}
 		}
 		catch (const std::exception &e)
 		{
 			std::cerr << e.what() << '\n';
 			ROS_ERROR_STREAM(tag << "Finding query output in :" << message);
+		}
+
+		// I2T check
+		i2t_flag.value.clear();
+		i2t_flag.header = header;
+		if (motor_amps_index_ != -1 && runtime_status_flags_index_ != -1 && runtime_status_flags_.value.size() == motor_amps_.value.size())
+		{
+			for(int i=0; i < runtime_status_flags_.value.size(); i++)
+			{
+				i2t_flag.value.push_back(0);
+				// Check if Amp Limit is present
+				if (runtime_status_flags_.value[i] % 2 == 1)
+				{
+					if (std::abs(motor_amps_.value[i])/10.0 > 1.1 * nominal_current_[i])
+					{
+						ROS_WARN_STREAM(tag << "AmpLim protection in Channel: " << i);
+					}
+					else
+					{
+						ROS_WARN_STREAM(tag << "I2T protection in Channel: " << i);
+						i2t_flag.value.back()= 1;
+					}
+				}
+			}
+			i2t_pub_.publish(i2t_flag);
+		}
+		else
+		{
+			ROS_ERROR_STREAM(tag << "Cannot perform I2T check");
 		}
 
 		// Clear query fields
