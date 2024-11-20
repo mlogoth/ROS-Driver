@@ -12,6 +12,7 @@
 #include <roboteq_motor_controller_driver/roboteq_motor_controller_driver_node.h>
 #include <string>
 #include <sstream>
+#include <mutex>
 
 class Odometry_calc
 {
@@ -91,9 +92,10 @@ private:
 	double x_final, y_final, theta_final;
 
 	//imu variables
+	std::mutex imu_mtx_;
 	bool imu_initialized;
-	double prev_imu_yaw, imu_yaw, imu_yaw_init;
-	int imu_cnt;
+	double prev_imu_yaw, imu_yaw, imu_yaw_init{0.0};
+	int imu_cnt{0};
 
 	//funcs and callbacks
 	void encoderBCR(const roboteq_motor_controller_driver::channel_values &left_ticks);
@@ -303,16 +305,22 @@ void Odometry_calc::update()
 	}
 
 	//angular
-	if ((!enable_imu_yaw) || (enable_imu_yaw && !imu_initialized))
 	{
-		DeltaTh = (d_left - d_right) / track_width; // th is tan(th)
-		dr = DeltaTh / elapsed;
-		theta_final = theta_final + DeltaTh;
-	}
-	else
-	{
-		theta_final = imu_yaw;
-		dr = (imu_yaw - prev_imu_yaw)/elapsed;
+		std::lock_guard<std::mutex> imu_lock(imu_mtx_);     
+    
+		if ((!enable_imu_yaw) || (enable_imu_yaw && !imu_initialized))
+		{
+			DeltaTh = (d_left - d_right) / track_width; // th is tan(th)
+			dr = DeltaTh / elapsed;
+			theta_final = theta_final + DeltaTh;
+		}
+		else
+		{
+			theta_final = imu_yaw;
+			dr = theta_final - prev_imu_yaw;
+			dr = (abs(dr)/dr * std::min(std::fmod(std::fmod(-abs(dr),M_PI)+M_PI,M_PI), std::fmod(abs(dr),M_PI)))/elapsed;
+			prev_imu_yaw = theta_final;
+		}
 	}
 
 	//wrap angle values between -180 and 1800 degrees
@@ -413,7 +421,6 @@ void Odometry_calc::imu_setup()
 
 void Odometry_calc::imu_callback(const sensor_msgs::Imu &imu)
 {
-	prev_imu_yaw = imu_yaw;
 	//TF quaternion
 	tf::Quaternion q(
 		imu.orientation.x,
@@ -429,6 +436,7 @@ void Odometry_calc::imu_callback(const sensor_msgs::Imu &imu)
 	// Check if yaw is NaN: When yaw= NaN, then the statement yaw!=yaw is always True
 	if (yaw == yaw)
 	{
+		std::lock_guard<std::mutex> imu_lock(imu_mtx_); 
 		if (imu_cnt < imu_discarded)
 		{
 			imu_yaw_init = imu_yaw_init + yaw;
@@ -437,12 +445,14 @@ void Odometry_calc::imu_callback(const sensor_msgs::Imu &imu)
 			{
 				ROS_WARN("Odometry YAW initialized!");
 				imu_yaw_init /= (double)(imu_cnt);
+				imu_yaw = imu_yaw_init;			
+				prev_imu_yaw = imu_yaw_init;
+				imu_initialized = true;
 			}
 		}
 		else
 		{
 			imu_yaw = (double)yaw - (double)imu_yaw_init;
-			imu_initialized = true;
 		}
 	}
 }
