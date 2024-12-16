@@ -318,7 +318,10 @@ void Odometry_calc::update()
 		{
 			theta_final = imu_yaw;
 			dr = theta_final - prev_imu_yaw;
-			dr = (abs(dr)/dr * std::min(std::fmod(std::fmod(-abs(dr),M_PI)+M_PI,M_PI), std::fmod(abs(dr),M_PI)))/elapsed;
+			if (abs(dr) > 1e-7)
+			{
+				dr = (abs(dr)/dr * std::min(std::fmod(std::fmod(-abs(dr),M_PI)+M_PI,M_PI), std::fmod(abs(dr),M_PI)))/elapsed;
+			}			
 			prev_imu_yaw = theta_final;
 		}
 	}
