@@ -262,16 +262,9 @@ void RoboteqDriver::rpm_mapping(const double &right_speed, const double &left_sp
 	double ln = 1.0;
 	if (mx>max_vel_wheel)
 		ln = max_vel_wheel/mx;
-	// std::cout << "Max RPM: "<<max_rpm << std::endl;
+	
 	right_speed_cr = ln*right_speed;
 	left_speed_cr = ln*left_speed;
-	// std::cout<<"================================="<<std::endl;
-	// std::cout<<"max_vel_wheel: "<<max_vel_wheel<<std::endl;
-	// std::cout<<"right_speed: "<<right_speed<<std::endl;
-	// std::cout<<"left_speed: "<<left_speed<<std::endl;
-	// std::cout<<"right_speed_cr: "<<right_speed_cr<<std::endl;
-	// std::cout<<"left_speed_cr: "<<left_speed_cr<<std::endl;
-
 }
 
 void RoboteqDriver::skid_steering_vel_callback(const geometry_msgs::Twist &msg)
@@ -304,12 +297,10 @@ void RoboteqDriver::skid_steering_vel_callback(const geometry_msgs::Twist &msg)
 			a = 0.6;
 		}
 	}
-	// std::cout << "a: "<< a << std::endl;
+	
 	double vw = a*msg.angular.z; 
 	double vx = a*msg.linear.x;
-	// std::cout << "Initial Linear: "<<msg.linear.x<<"| angular: "<<msg.angular.z << std::endl;
-	// std::cout << "vx: "<< vx << std::endl;
-	// std::cout << "vw: "<< vw << std::endl;
+
 	if (fabs(vx) > max_vel_x)
 	{
 		vx = sgn(vx)*max_vel_x;
@@ -324,34 +315,18 @@ void RoboteqDriver::skid_steering_vel_callback(const geometry_msgs::Twist &msg)
 	double right_speed = vx - track_width * vw / 2.0;
 	double left_speed = vx + track_width * vw / 2.0;
 
-	// ROS_INFO_STREAM("================================");
-	// ROS_INFO_STREAM("right_speed: " << right_speed);
-	// ROS_INFO_STREAM("left_speed: " << left_speed);
 	double right_speed_cr;
 	double left_speed_cr;
 	rpm_mapping(right_speed,left_speed,right_speed_cr,left_speed_cr);
-	
-	// std::stringstream cmd_sub;
-	// ROS_INFO_STREAM("================================");
-	// ROS_INFO_STREAM("right_speed: " << right_speed);
-	// ROS_INFO_STREAM("left_speed: " << left_speed);
 
 	int32_t right_rpm = (right_speed_cr * reduction_ratio * 60.0) / (wheel_circumference);
 	int32_t left_rpm = (left_speed_cr * reduction_ratio * 60.0) / (wheel_circumference);
-
-	// ROS_INFO_STREAM(reduction_ratio);
-	// ROS_INFO_STREAM("================================");
-	// ROS_INFO_STREAM("right_rpm: " << right_rpm);
-	// ROS_INFO_STREAM("left_rpm: " << left_rpm);
 
 	std::stringstream right_cmd;
 	std::stringstream left_cmd;
 
 	right_cmd << "!S 1 " << (int)(right_rpm) << "\r";
 	left_cmd << "!S 2 " << (int)(left_rpm) << "\r";
-
-	// ROS_INFO_STREAM("----------------------------");
-	// ROS_INFO_STREAM("Wheel Motors: right_rpm: "<<right_rpm << " - left_rpm: "<<left_rpm);
 
 	ser_.write(right_cmd.str());
 	ser_.write(left_cmd.str());
@@ -362,9 +337,6 @@ void RoboteqDriver::dual_vel_callback(const std_msgs::Int16 &msg)
 {
 	// wheel speed (m/s)
 	int cmd = msg.data;
-
-	// ROS_INFO_STREAM("================================");
-	// ROS_INFO_STREAM("Motor Command:" << cmd);
 
 	std::stringstream right_cmd;
 	std::stringstream left_cmd;
@@ -405,8 +377,6 @@ void RoboteqDriver::channel_1_vel_callback(const std_msgs::Int16 &msg)
 		ROS_ERROR("Channel 1: Not Valid Motor Type");
 	}
 
-	// std::cout << "-- Channel 1 Callback: Type: "<<motor_1_type <<  "| CMD: "<< cmd << "|Channel Command: " << channel_1_cmd.str()<< std::endl;
-
 	ser_.write(channel_1_cmd.str());
 	ser_.flush();
 }
@@ -431,10 +401,6 @@ void RoboteqDriver::channel_2_vel_callback(const std_msgs::Int16 &msg)
 		ROS_ERROR("Channel 2: Not Valid Motor Type");
 	}
 
-	// std::cout << "-- Channel 2 Callback: Type: "<<motor_2_type <<  "|CMD: "<< cmd << "|Channel Command: " << channel_2_cmd.str()<< std::endl;
-
-	// ser_.write("!AC 2 2000_");
-	// ser_.write("!DC 2 50_");
 	ser_.write(channel_2_cmd.str());
 	ser_.flush();
 }
@@ -480,8 +446,8 @@ void RoboteqDriver::run()
 	nh_.getParam("frequency_list", f_list);
 
 	std::stringstream ss_gen;
-	ss_gen << "^echof 1_"; // Disable echo from driver
-	ss_gen << "# c_";	   // Clear Buffer History of previous queries
+	ss_gen << "^echof 1_"; 	// Disable echo from driver
+	ss_gen << "# c_";	// Clear Buffer History of previous queries
 
 	for (int i = 0; i < f_list.size(); i++)
 	{
@@ -565,9 +531,8 @@ bool RoboteqDriver::resetstoservice(std_srvs::Trigger::Request &request, std_srv
 {	
 	ser_.write("!STT\r");
 	ser_.flush();
-	response.success=true; //= ser_.read(ser_.available());
+	response.success=true;
 	response.message="STO Test message sent to serial";
-	//ROS_INFO(response.message.c_str());
 	return true;
 }
 
