@@ -21,7 +21,15 @@ jobs:
       with:
         required-ros-distributions: "melodic"
 
-    # Step 3: Install dependencies using rosdep
+    # Step 3: Cache Dependencies
+    - name: Cache rosdep Dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.ros/rosdep/cache
+        key: ${{ runner.os }}-rosdep-${{ hashFiles('src/**') }}
+        restore-keys: ${{ runner.os }}-rosdep-
+
+    # Step 4: Install dependencies using rosdep
     - name: Install Dependencies
       run: |
         sudo apt-get update
@@ -29,19 +37,20 @@ jobs:
         rosdep update
         rosdep install --from-paths src --ignore-src -r -y
 
-    # Step 4: Build the ROS workspace
+    # Step 5: Build the ROS workspace (parallelized)
     - name: Build Workspace
       run: |
         source /opt/ros/melodic/setup.bash
-        catkin_make
+        catkin_make -j$(nproc)
 
-    # Step 5: Run Unit Tests
+    # Step 6: Run Unit Tests
     - name: Run Tests
       run: |
         source /opt/ros/melodic/setup.bash
-        catkin_make run_tests
+        catkin_make run_tests -j$(nproc)
+        catkin_test_results
 
-    # Step 6: Static Analysis with cppcheck
+    # Step 7: Static Analysis with cppcheck (optional cache)
     - name: Static Analysis with cppcheck
       run: |
         sudo apt-get install -y cppcheck
