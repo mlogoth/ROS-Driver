@@ -1,0 +1,48 @@
+name: ROS1 CI/CD Pipeline for Melodic
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-18.04
+
+    steps:
+    # Step 1: Checkout the code
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # Step 2: Set up ROS Melodic
+    - name: Set up ROS Melodic
+      uses: ros-tooling/setup-ros@v0.3
+      with:
+        required-ros-distributions: "melodic"
+
+    # Step 3: Install dependencies using rosdep
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        source /opt/ros/melodic/setup.bash
+        rosdep update
+        rosdep install --from-paths src --ignore-src -r -y
+
+    # Step 4: Build the ROS workspace
+    - name: Build Workspace
+      run: |
+        source /opt/ros/melodic/setup.bash
+        catkin_make
+
+    # Step 5: Run Unit Tests
+    - name: Run Tests
+      run: |
+        source /opt/ros/melodic/setup.bash
+        catkin_make run_tests
+
+    # Step 6: Static Analysis with cppcheck
+    - name: Static Analysis with cppcheck
+      run: |
+        sudo apt-get install -y cppcheck
+        cppcheck --enable=all --std=c++14 src/
